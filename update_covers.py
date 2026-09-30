@@ -1,12 +1,12 @@
-import sqlite3
 import re
+import sqlite3
 import requests
 
 DB_NAME = "atlas_library.db"
 
 
 def clean_title(title):
-  """Arama için kitap adını sadeleştirir."""
+  """Arama için kitap adını sadeleştirir (Parantez ve özel karakterleri temizler)."""
   if not title:
     return ""
   title = re.sub(r"\(.*?\)", "", title)
@@ -16,12 +16,12 @@ def clean_title(title):
 
 
 def fetch_cover_from_open_library(title):
-  """Open Library Search API kullanarak kitap adından kapak ID'si (cover_i) bulur."""
+  """Open Library Search API kullanarak kitap adından kapak ID'si (cover_i) veya ISBN bulur."""
   cleaned = clean_title(title)
   if not cleaned.strip():
     return None
 
-  # 1. Adım: Open Library Kitap Arama API'si
+  # Open Library Kitap Arama API'si
   search_url = f"https://openlibrary.org/search.json?title={requests.utils.quote(cleaned)}"
 
   try:
@@ -30,20 +30,20 @@ def fetch_cover_from_open_library(title):
       data = response.json()
       docs = data.get("docs", [])
       if docs:
-        # İlk eşleşen kitabın kapak ID'sini (cover_i) veya ISBN'ini arayalım
-        for doc in docs[:3]:  # İlk 3 sonuca bakalım
+        # İlk 3 sonuca bakalım
+        for doc in docs[:3]:
+          # 1. Öncelikli olarak cover_i değerini arayalım
           cover_i = doc.get("cover_i")
           if cover_i:
-            # Open Library'nin standart kapak görseli URL formatı (L = Large/Büyük boy)
             return f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
 
-          # Eğer cover_i yoksa ISBN ile deneyelim
+          # 2. Eğer cover_i yoksa ISBN ile deneyelim
           isbns = doc.get("isbn")
           if isbns:
             isbn = isbns[0]
             return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
   except Exception as e:
-    pass
+    print(f"Hata oluştu ({title}): {e}")
 
   return None
 
@@ -52,6 +52,7 @@ def update_all_missing_covers():
   conn = sqlite3.connect(DB_NAME)
   cursor = conn.cursor()
 
+  # Kapak görseli eksik veya boş olan kitapları seçelim
   cursor.execute(
       "SELECT id, title FROM books WHERE cover_url IS NULL OR cover_url = ''"
   )
@@ -75,7 +76,7 @@ def update_all_missing_covers():
       print(" -> Open Library'den kapak bulundu ve eklendi! ✅")
       updated_count += 1
     else:
-      print(" -> Bulunamadı ❌")
+      print(" -> Kapak bulunamadı ❌")
 
   conn.close()
   print(

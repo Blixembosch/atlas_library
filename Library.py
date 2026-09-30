@@ -140,8 +140,10 @@ with st.sidebar:
   st.markdown("<h3 style='color: #2d4739;'>🔐 Yönetim</h3>", unsafe_allow_html=True)
   admin_pass = st.text_input("Şifre", type="password")
 
-  if admin_pass == "Eindhoven22!" or st.session_state.admin_mode:
+  if admin_pass == "Atlas!":
     st.session_state.admin_mode = True
+
+  if st.session_state.admin_mode:
     st.success("Yönetim Aktif ✅")
     if st.button("Çıkış Yap"):
       st.session_state.admin_mode = False
@@ -156,10 +158,11 @@ if st.session_state.admin_mode:
       unsafe_allow_html=True,
   )
 
-  tab1, tab2, tab3 = st.tabs([
+  tab1, tab2, tab3, tab4 = st.tabs([
       "➕ Yeni Kitap Ekle",
       "✏️ Mevcut Kitabı Düzenle",
-      "🖼️ Eksik Kapaklar (Takip & Yönetim)",
+      "🖼️ Eksik Kapaklar",
+      "📚 Eksik Sayfalar",
   ])
 
   with tab1:
@@ -179,10 +182,10 @@ if st.session_state.admin_mode:
           ],
       )
       new_age = st.selectbox("Yaş Grubu", ["3+", "5+", "6+", "7+"])
-      new_cover = st.text_input(
-          "Kapak Görsel URL (İsteğe bağlı - Boş bırakılırsa varsayılan"
-          " kullanılır)"
+      new_page = st.number_input(
+          "Sayfa Sayısı", min_value=1, max_value=1000, value=32
       )
+      new_cover = st.text_input("Kapak Görsel URL (İsteğe bağlı)")
 
       submit_add = st.form_submit_button("🚀 Kitabı Veritabanına Ekle")
       if submit_add:
@@ -191,14 +194,15 @@ if st.session_state.admin_mode:
           cursor = conn.cursor()
           cursor.execute(
               """
-                        INSERT INTO books (title, publisher, category, age_group, cover_url, read_count)
-                        VALUES (?, ?, ?, ?, ?, 0)
+                        INSERT INTO books (title, publisher, category, age_group, page_count, cover_url, read_count)
+                        VALUES (?, ?, ?, ?, ?, ?, 0)
                     """,
               (
                   new_title,
                   new_publisher,
                   new_category,
                   new_age,
+                  new_page,
                   new_cover,
               ),
           )
@@ -224,6 +228,17 @@ if st.session_state.admin_mode:
       ed_publisher = st.text_input(
           "Yayınevi", value=str(curr_book.get("publisher", ""))
       )
+      ed_page = st.number_input(
+          "Sayfa Sayısı",
+          min_value=1,
+          max_value=1000,
+          value=(
+              int(curr_book["page_count"])
+              if not pd.isna(curr_book.get("page_count"))
+              and str(curr_book.get("page_count")).isdigit()
+              else 32
+          ),
+      )
       ed_age = st.selectbox(
           "Yaş Grubu",
           ["3+", "5+", "6+", "7+"],
@@ -248,9 +263,9 @@ if st.session_state.admin_mode:
         cursor = conn.cursor()
         cursor.execute(
             """
-                    UPDATE books SET title = ?, publisher = ?, age_group = ?, cover_url = ? WHERE id = ?
+                    UPDATE books SET title = ?, publisher = ?, page_count = ?, age_group = ?, cover_url = ? WHERE id = ?
                 """,
-            (ed_title, ed_publisher, ed_age, ed_cover, b_id),
+            (ed_title, ed_publisher, ed_page, ed_age, ed_cover, b_id),
         )
         conn.commit()
         conn.close()
@@ -281,21 +296,16 @@ if st.session_state.admin_mode:
           use_container_width=True,
       )
 
-      st.markdown("#### Hızlı Kapak Ekle / Düzelt")
       selected_missing_id = st.selectbox(
           "Düzenlemek İstediğin Eksik Kitabı Seç",
           missing_df["id"].astype(str) + " - " + missing_df["title"],
           key="missing_selectbox",
       )
       m_id = selected_missing_id.split(" - ")[0]
-      m_curr = missing_df[missing_df["id"].astype(str) == m_id].iloc[0]
 
       with st.form("quick_cover_form"):
-        st.write(f"**Seçilen Kitap:** {m_curr['title']}")
         new_url_input = st.text_input("Kapak Resim URL Adresi")
-        submit_quick_cover = st.form_submit_button(
-            "✨ Kapak URL'sini Kaydet ve Güncelle"
-        )
+        submit_quick_cover = st.form_submit_button("✨ Kapak URL'sini Kaydet")
 
         if submit_quick_cover:
           if new_url_input:
@@ -312,11 +322,57 @@ if st.session_state.admin_mode:
             st.rerun()
           else:
             st.error("Lütfen geçerli bir URL yazın.")
-    else:
-      st.success(
-          "Harika! Veritabanında kapaksız hiçbir kitap kalmamış. Tüm"
-          " kapaklar tam yerinde! 🚀"
+
+  with tab4:
+    st.markdown("### 📚 Sayfa Sayısı Eksik Olan Kitaplar")
+    missing_page_df = books_df[
+        books_df["page_count"].isna()
+        | (books_df["page_count"] == "")
+        | (books_df["page_count"] == 0)
+        | (books_df["page_count"] == "-")
+    ]
+    st.info(
+        f"Toplam {len(missing_page_df)} adet sayfa bilgisi eksik kitap"
+        " bulunuyor."
+    )
+
+    if len(missing_page_df) > 0:
+      st.dataframe(
+          missing_page_df[["id", "title", "publisher", "category"]],
+          use_container_width=True,
       )
+
+      selected_page_id = st.selectbox(
+          "Sayfa Sayısını Güncellemek İçin Kitap Seç",
+          missing_page_df["id"].astype(str)
+          + " - "
+          + missing_page_df["title"],
+          key="page_selectbox",
+      )
+      p_id = selected_page_id.split(" - ")[0]
+
+      with st.form("quick_page_form"):
+        new_page_input = st.number_input(
+            "Doğru Sayfa Sayısı", min_value=1, max_value=1000, value=32
+        )
+        submit_quick_page = st.form_submit_button(
+            "✨ Sayfa Sayısını Kaydet ve Güncelle"
+        )
+
+        if submit_quick_page:
+          conn = sqlite3.connect(DB_NAME)
+          cursor = conn.cursor()
+          cursor.execute(
+              "UPDATE books SET page_count = ? WHERE id = ?",
+              (new_page_input, p_id),
+          )
+          conn.commit()
+          conn.close()
+          st.success("Sayfa sayısı başarıyla güncellendi! 🎉")
+          st.cache_data.clear()
+          st.rerun()
+    else:
+      st.success("Harika! Veritabanında sayfa sayısı eksik kitap kalmadı. 🚀")
 
 # --- ANA EKRAN ---
 st.markdown(
@@ -459,48 +515,117 @@ if book:
   else:
     st.info("Bu kitap için görsel eklenmemiş.")
 
+  page_val = book.get("page_count")
+  page_display = (
+      str(page_val)
+      if not pd.isna(page_val)
+      and str(page_val).strip() != ""
+      and str(page_val).strip() != "0"
+      and str(page_val).strip() != "-"
+      and str(page_val).strip() != "None"
+      else "-"
+  )
+
   st.markdown(
       f"""
         <div class="book-title">📖 {book['title']}</div>
         <div class="book-info">🎯 <b>Yaş:</b> {book.get('age_group', '5+')} &nbsp;|&nbsp; 🏷️ <b>Tür:</b> {book.get('main_category', 'Okuma')}</div>
         <div class="book-info">🏢 <b>Yayınevi:</b> {book['publisher']} &nbsp;|&nbsp; 📂 <b>Kategori:</b> {book['category']}</div>
-        <div class="book-info">📄 <b>Sayfa:</b> {book.get('page_count', '-')} &nbsp;|&nbsp; 🔄 <b>Okunma:</b> {book.get('read_count', 0)}</div>
+        <div class="book-info">📄 <b>Sayfa:</b> {page_display} &nbsp;|&nbsp; 🔄 <b>Okunma:</b> {book.get('read_count', 0)}</div>
     </div>
     """,
       unsafe_allow_html=True,
   )
 
   st.markdown("<br>", unsafe_allow_html=True)
-  col_a1, col_a2, col_a3 = st.columns([1, 2, 1])
-  with col_a2:
-    if st.button(f"🎉 BU KİTABI OKUDUK! ({book['title']})"):
-      conn = sqlite3.connect(DB_NAME)
-      cursor = conn.cursor()
-      cursor.execute(
-          """
-                UPDATE books 
-                SET read_count = read_count + 1, last_read_date = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """,
-          (book["id"],),
-      )
-      conn.commit()
-      conn.close()
-      st.balloons()
-      st.success(f"Harika iş çıkardın Atlas! '{book['title']}' okundu! 🌟")
-      unread_pool = (
-          filtered_df[filtered_df["read_count"] == 0]
-          if "read_count" in filtered_df.columns
-          else filtered_df
-      )
-      target_pool = unread_pool if len(unread_pool) > 0 else filtered_df
-      if len(target_pool) > 0:
-        st.session_state.current_featured_book = (
-            target_pool.sample(n=1).iloc[0].to_dict()
+
+  # --- SAYFA KONTROLLÜ OKUNDU İŞARETLEME MANTIĞI ---
+  is_page_missing = (
+      page_val is None
+      or str(page_val).strip() in ["", "-", "0", "None"]
+      or pd.isna(page_val)
+  )
+
+  if is_page_missing:
+    st.warning(
+        "⚠️ Bu kitabın sayfa sayısı eksik. Lütfen okundu olarak işaretlemeden"
+        " önce sayfa sayısını belirtin:"
+    )
+    entered_pages = st.number_input(
+        "Sayfa Sayısı", min_value=1, max_value=1000, value=32, key=f"p_{book['id']}"
+    )
+
+    col_m1, col_m2, col_m3 = st.columns([1, 2, 1])
+    with col_m2:
+      if st.button("✨ Sayfayı Kaydet ve Okundu İşaretle"):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        # 1. Sayfa sayısını ve okundu durumunu güncelle
+        cursor.execute(
+            """
+                    UPDATE books 
+                    SET page_count = ?, read_count = read_count + 1, last_read_date = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """,
+            (entered_pages, book["id"]),
         )
-      else:
-        st.session_state.current_featured_book = None
-      st.rerun()
+        conn.commit()
+        conn.close()
+        st.balloons()
+        st.success(
+            f"Harika iş çıkardın Atlas! Sayfa kaydedildi ve '{book['title']}'"
+            " okundu! 🌟"
+        )
+        st.cache_data.clear()
+
+        # Sonraki kitaba geçiş
+        unread_pool = (
+            filtered_df[filtered_df["read_count"] == 0]
+            if "read_count" in filtered_df.columns
+            else filtered_df
+        )
+        target_pool = unread_pool if len(unread_pool) > 0 else filtered_df
+        if len(target_pool) > 0:
+          st.session_state.current_featured_book = (
+              target_pool.sample(n=1).iloc[0].to_dict()
+          )
+        else:
+          st.session_state.current_featured_book = None
+        st.rerun()
+
+  else:
+    col_a1, col_a2, col_a3 = st.columns([1, 2, 1])
+    with col_a2:
+      if st.button(f"🎉 BU KİTABI OKUDUK! ({book['title']})"):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+                    UPDATE books 
+                    SET read_count = read_count + 1, last_read_date = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """,
+            (book["id"],),
+        )
+        conn.commit()
+        conn.close()
+        st.balloons()
+        st.success(f"Harika iş çıkardın Atlas! '{book['title']}' okundu! 🌟")
+        st.cache_data.clear()
+
+        unread_pool = (
+            filtered_df[filtered_df["read_count"] == 0]
+            if "read_count" in filtered_df.columns
+            else filtered_df
+        )
+        target_pool = unread_pool if len(unread_pool) > 0 else filtered_df
+        if len(target_pool) > 0:
+          st.session_state.current_featured_book = (
+              target_pool.sample(n=1).iloc[0].to_dict()
+          )
+        else:
+          st.session_state.current_featured_book = None
+        st.rerun()
 else:
   st.info("Bu kategoride henüz kitap bulunmuyor.")
 
