@@ -140,7 +140,7 @@ with st.sidebar:
   st.markdown("<h3 style='color: #2d4739;'>🔐 Yönetim</h3>", unsafe_allow_html=True)
   admin_pass = st.text_input("Şifre", type="password")
 
-  if admin_pass == "Atlas!" or st.session_state.admin_mode:
+  if admin_pass == "Eindhoven22!" or st.session_state.admin_mode:
     st.session_state.admin_mode = True
     st.success("Yönetim Aktif ✅")
     if st.button("Çıkış Yap"):
