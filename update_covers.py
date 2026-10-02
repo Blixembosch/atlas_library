@@ -14,54 +14,84 @@ def clean_title(title):
     title = re.sub(r"[^\w\s]", " ", title)
     return " ".join(title.split()).lower()
 
-def fetch_cover_from_tubitak_category(title):
-    """TÜBİTAK Okul Öncesi Kitaplığı kategorisinden eşleşme arar."""
+def is_cover_already_used(cursor, cover_url, current_book_id):
+    """Veritabanında bu görselin başka bir kitapta kullanılıp kullanılmadığını kontrol eder."""
+    if not cover_url:
+        return False
+    cursor.execute("SELECT COUNT(*) FROM books WHERE cover_url = ? AND id != ?", (cover_url, current_book_id))
+    count = cursor.fetchone()[0]
+    return count > 0
+
+def fetch_cover_from_abm(title):
     try:
-        url = "https://yayinlar.tubitak.gov.tr/kategori/okul-oencesi-kitapligi-71"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=8)
+        search_url = f"https://www.abmyayinevi.com.tr/arama?q={requests.utils.quote(clean_title(title))}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(search_url, headers=headers, timeout=6)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
-            items = soup.select(".product-item, .product, li.item")
-            cleaned_target = clean_title(title)
-            for item in items:
-                img = item.select_one("img")
-                title_tag = item.select_one(".product-title, h2, h3, a")
-                if img and title_tag:
-                    item_title = clean_title(title_tag.get_text())
-                    if cleaned_target in item_title or item_title in cleaned_target:
-                        return img.get("src") or img.get("data-src")
+            img = soup.select_one(".product-item img, .product img, .image img, .prd-img img")
+            if img:
+                url = img.get("src") or img.get("data-src")
+                if url:
+                    if "http" not in url:
+                        url = "https:" + url if url.startswith("//") else "https://www.abmyayinevi.com.tr" + url
+                    return url
     except Exception:
         pass
     return None
 
-def fetch_cover_from_iskultur_series(title):
-    """İş Bankası Dünyayı Öğreniyorum serisi sayfasından arar."""
+def fetch_cover_from_kitapyurdu(title):
     try:
-        url = "https://www.iskultur.com.tr/kitap/resimli-kitaplar/dunyayi-ogreniyorum"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=8)
+        search_url = f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={requests.utils.quote(clean_title(title))}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(search_url, headers=headers, timeout=6)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
-            items = soup.select(".product-item, .item.product")
-            cleaned_target = clean_title(title)
-            for item in items:
-                img = item.select_one("img")
-                title_tag = item.select_one(".product-item-link, .product-name")
-                if img and title_tag:
-                    item_title = clean_title(title_tag.get_text())
-                    if cleaned_target in item_title or item_title in cleaned_target:
-                        return img.get("src") or img.get("data-src")
+            img = soup.select_one(".product-image img, .image img")
+            if img:
+                url = img.get("src") or img.get("data-src")
+                if url:
+                    clean_url = url.replace("getImage.php?image=", "").split("&")[0]
+                    if "http" not in clean_url:
+                        clean_url = "https:" + clean_url if clean_url.startswith("//") else "https://www.kitapyurdu.com" + clean_url
+                    return clean_url
+    except Exception:
+        pass
+    return None
+
+def fetch_cover_from_dr(title):
+    try:
+        search_url = f"https://www.dr.com.tr/search?q={requests.utils.quote(clean_title(title))}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(search_url, headers=headers, timeout=6)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, "html.parser")
+            img = soup.select_one(".product-image img, .prd-img img, img.lazy")
+            if img:
+                return img.get("src") or img.get("data-src")
+    except Exception:
+        pass
+    return None
+
+def fetch_cover_from_tubitak(title):
+    try:
+        search_url = f"https://yayinlar.tubitak.gov.tr/arama?q={requests.utils.quote(clean_title(title))}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(search_url, headers=headers, timeout=6)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, "html.parser")
+            img = soup.select_one(".product-item img, .product img, img")
+            if img:
+                return img.get("src") or img.get("data-src")
     except Exception:
         pass
     return None
 
 def fetch_cover_from_iskultur(title):
-    """İş Bankası Kültür Yayınları Genel Arama"""
     try:
         search_url = f"https://www.iskultur.com.tr/catalogsearch/result/?q={requests.utils.quote(clean_title(title))}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(search_url, headers=headers, timeout=5)
+        res = requests.get(search_url, headers=headers, timeout=6)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
             img = soup.select_one(".product-image-photo, .product-image img")
@@ -72,53 +102,15 @@ def fetch_cover_from_iskultur(title):
     return None
 
 def fetch_cover_from_yky(title):
-    """Yapı Kredi Yayınları Arama"""
     try:
         search_url = f"https://www.yapikrediyayinlari.com.tr/arama?q={requests.utils.quote(clean_title(title))}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(search_url, headers=headers, timeout=5)
+        res = requests.get(search_url, headers=headers, timeout=6)
         if res.status_code == 200:
             soup = BeautifulSoup(res.text, "html.parser")
-            img = soup.select_one(".product-item img, .book-image img")
+            img = soup.select_one(".product-item img, .book-image img, .cover img")
             if img:
                 return img.get("src") or img.get("data-src")
-    except Exception:
-        pass
-    return None
-
-def fetch_cover_from_kitapyurdu(title):
-    """Kitapyurdu Arama"""
-    try:
-        search_url = f"https://www.kitapyurdu.com/index.php?route=product/search&filter_name={requests.utils.quote(clean_title(title))}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(search_url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, "html.parser")
-            img = soup.select_one(".product-image img")
-            if img:
-                url = img.get("src") or img.get("data-src")
-                if url:
-                    return url.replace("getImage.php?image=", "").split("&")[0]
-    except Exception:
-        pass
-    return None
-
-def fetch_cover_from_open_library(title):
-    """Open Library Küresel Veritabanı"""
-    try:
-        cleaned = clean_title(title)
-        if not cleaned.strip():
-            return None
-        search_url = f"https://openlibrary.org/search.json?title={requests.utils.quote(cleaned)}"
-        res = requests.get(search_url, timeout=5)
-        if res.status_code == 200:
-            docs = res.json().get("docs", [])
-            if docs:
-                for doc in docs[:3]:
-                    if doc.get("cover_i"):
-                        return f"https://covers.openlibrary.org/b/id/{doc.get('cover_i')}-L.jpg"
-                    if doc.get("isbn"):
-                        return f"https://covers.openlibrary.org/b/isbn/{doc.get('isbn')[0]}-L.jpg"
     except Exception:
         pass
     return None
@@ -131,59 +123,89 @@ def update_database_covers():
     con = sqlite3.connect(DB_NAME)
     cursor = con.cursor()
     
-    # Bozuk veya longitood linklerini temizleyip boşalt (böylece onlar da taranacaklar listesine girer)
-    cursor.execute("UPDATE books SET cover_url = '' WHERE cover_url IS NULL OR cover_url = '' OR cover_url LIKE '%longitood.com%'")
+    # 1. Mükerrer (ortak) kapakları temizle
+    cursor.execute("""
+        UPDATE books 
+        SET cover_url = '' 
+        WHERE cover_url IN (
+            SELECT cover_url FROM books 
+            WHERE cover_url IS NOT NULL AND cover_url != '' 
+            GROUP BY cover_url 
+            HAVING COUNT(*) > 1
+        )
+    """)
     con.commit()
 
-    # Sadece kapağı olmayan (boş olan) kitapları seçiyoruz
+    # 2. Hatalı veya boş kapakları sıfırla
+    cursor.execute("UPDATE books SET cover_url = '' WHERE cover_url IS NULL OR cover_url = '' OR cover_url LIKE '%longitood.com%' OR cover_url LIKE '%dogada-bir-an%'")
+    con.commit()
+
     cursor.execute("SELECT id, title, publisher FROM books WHERE cover_url IS NULL OR cover_url = ''")
     books = cursor.fetchall()
     
-    print(f"🔍 Toplam {len(books)} adet eksik kapaklı kitap taranıyor (Mevcut kapaklılara dokunulmuyor)...")
+    print(f"🔍 Toplam {len(books)} adet eksik kapaklı kitap yayınevi kaynaklarına göre taranıyor...")
     updated = 0
+    missing_books = []
 
     for book_id, title, publisher in books:
         print(f"Araniyor: {title} ({publisher or 'Bilinmiyor'})")
         cover_url = None
-
-        # 1. TÜBİTAK Özel Kategori Taraması
-        cover_url = fetch_cover_from_tubitak_category(title)
-        
-        # 2. İş Bankası Dünyayı Öğreniyorum Serisi Taraması
-        if not cover_url:
-            cover_url = fetch_cover_from_iskultur_series(title)
-
-        # 3. Yayınevine Özel Genel Arama (İşkültür veya YKY)
         pub_lower = str(publisher).lower()
-        if not cover_url and ("iş bankası" in pub_lower or "iş kültür" in pub_lower):
+
+        # Yayınevine özel öncelikli arama
+        if "abm" in pub_lower:
+            cover_url = fetch_cover_from_abm(title)
+        elif "tübitak" in pub_lower:
+            cover_url = fetch_cover_from_tubitak(title)
+        elif "iş bankası" in pub_lower or "iş kültür" in pub_lower:
             cover_url = fetch_cover_from_iskultur(title)
-        elif not cover_url and ("yapı kredi" in pub_lower or "yky" in pub_lower):
+        elif "yapı kredi" in pub_lower or "yky" in pub_lower:
             cover_url = fetch_cover_from_yky(title)
 
-        # 4. Kitapyurdu
+        # Genel kaynaklar
         if not cover_url:
             cover_url = fetch_cover_from_kitapyurdu(title)
+            if cover_url and is_cover_already_used(cursor, cover_url, book_id):
+                cover_url = None
 
-        # 5. Diğer Yayınevi Genel Arama Yedekleri
         if not cover_url:
+            cover_url = fetch_cover_from_dr(title)
+            if cover_url and is_cover_already_used(cursor, cover_url, book_id):
+                cover_url = None
+
+        # Yedek denemeler
+        if not cover_url and "abm" not in pub_lower:
+            cover_url = fetch_cover_from_abm(title)
+        if not cover_url and "tübitak" not in pub_lower:
+            cover_url = fetch_cover_from_tubitak(title)
+        if not cover_url and "iş" not in pub_lower:
             cover_url = fetch_cover_from_iskultur(title)
-        if not cover_url:
+        if not cover_url and "yapı" not in pub_lower:
             cover_url = fetch_cover_from_yky(title)
 
-        # 6. Open Library Küresel Veritabanı
-        if not cover_url:
-            cover_url = fetch_cover_from_open_library(title)
+        # Çift kontrol
+        if cover_url and is_cover_already_used(cursor, cover_url, book_id):
+            cover_url = None
 
         if cover_url:
             cursor.execute("UPDATE books SET cover_url = ? WHERE id = ?", (cover_url, book_id))
             con.commit()
-            print("  ✅ Kapak bulundu ve DB'ye kaydedildi!")
+            print("  ✅ Kapak bulundu ve kaydedildi!")
             updated += 1
         else:
             print("  ❌ Bulunamadı.")
+            missing_books.append(f"• {title} ({publisher or 'Bilinmeyen Yayınevi'})")
 
     con.close()
+    
     print(f"\n✨ İşlem tamamlandı! Toplam {updated} kitabın kapağı güncellendi.")
+    
+    if missing_books:
+        print(f"\n⚠️ KAPAK BULUNAMAYAN EKSİK KİTAPLAR ({len(missing_books)} adet):")
+        for mb in missing_books:
+            print(mb)
+    else:
+        print("\n🎉 Harika! Tüm eksik kitapların kapakları başarıyla tamamlandı.")
 
 if __name__ == "__main__":
     update_database_covers()

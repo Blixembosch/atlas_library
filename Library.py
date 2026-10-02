@@ -245,6 +245,55 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+# --- DETAY MODALI (POPUP) ---
+@st.dialog("📖 Kitap Detayları", width="large")
+def show_book_detail(b_id):
+  b_row = books_df[books_df["id"] == b_id]
+  if len(b_row) == 0:
+    st.error("Kitap bulunamadı.")
+    return
+
+  b = b_row.iloc[0]
+  c_img = cover(b.get("cover_url"))
+
+  logs_list = rows("reading_log")
+  book_logs = [l for l in logs_list if l.get("book_id") == b_id]
+  last_read_time = "Henüz okunmadı"
+  if book_logs:
+    sorted_logs = sorted(
+        book_logs, key=lambda x: x.get("read_at", ""), reverse=True
+    )
+    rat = sorted_logs[0].get("read_at")
+    if rat:
+      last_read_time = rat[:19].replace("T", " ")
+
+  col_d1, col_d2 = st.columns([1, 2])
+  with col_d1:
+    if c_img:
+      st.image(c_img, use_container_width=True)
+    else:
+      st.markdown(
+          '<div style="font-size: 6rem; text-align: center;">📘</div>',
+          unsafe_allow_html=True,
+      )
+  with col_d2:
+    st.markdown(f"### {b['title']}")
+    st.markdown(f"✍️ **Yazar:** {b.get('author', 'Bilinmiyor')}")
+    st.markdown(f"🏢 **Yayınevi:** {b.get('publisher', 'Bilinmiyor')}")
+    st.markdown(f"📌 **ISBN Numarası:** {b.get('isbn', 'Bulunmuyor')}")
+    st.markdown(f"📄 **Sayfa Sayısı:** {b.get('pages', '-')}")
+    st.markdown(
+        f"📂 **Kategori:** {b.get('category', '-')} &nbsp;|&nbsp; 🎯 **Yaş:**"
+        f" {b.get('age', '-')}"
+    )
+    st.markdown(f"🔄 **Toplam Okunma Sayısı:** {b.get('read_count', 0)}")
+    st.markdown(f"⏱️ **En Son Okunma Tarihi:** {last_read_time}")
+
+  if st.button("Kapat", use_container_width=True):
+    st.rerun()
+
+
 # --- ANA SEKMELER ---
 tab1, tab2, tab3, tab4 = st.tabs([
     "🎡 Sihirli Çark",
@@ -253,7 +302,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "⚙️ Yönetici Paneli",
 ])
 
-# 1. SEKME: SİHİRLİ ÇARK (2 Kitap Yan Yana ve Ortalı)
+# 1. SEKME: SİHİRLİ ÇARK
 with tab1:
   now = datetime.now(TZ)
 
@@ -332,7 +381,6 @@ with tab1:
         st.markdown('<div class="main-card">', unsafe_allow_html=True)
         cover_img = cover(book.get("cover_url"))
 
-        # Görseli doğrudan HTML ile ortalanmış şekilde basıyoruz
         if cover_img:
           img_html = f'<img src="{cover_img}" style="height: 180px; object-fit: contain; border-radius: 12px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">'
         else:
@@ -361,9 +409,7 @@ with tab1:
         st.markdown("<br>", unsafe_allow_html=True)
 
         if st.button(
-            f"🎉 OKUDUK! ({book['title']})",
-            key=f"read_btn_{book['id']}",
-            use_container_width=True,
+            "🎉 OKUDUK!", key=f"read_btn_{book['id']}", use_container_width=True
         ):
           con = sqlite3.connect(DB_NAME)
           con.execute(
@@ -405,10 +451,19 @@ with tab1:
   else:
     st.info("Bu kategoride henüz kitap bulunmuyor.")
 
-# 2. SEKME: KÜTÜPHANE VE ARAMA
+# 2. SEKME: KÜTÜPHANE VE ARAMA (Şık Açılır Menüler ile Filtreleme)
 with tab2:
   st.markdown("### 📖 Kütüphane Arşivi ve Arama")
-  col_s1, col_s2 = st.columns([2, 1])
+
+  all_publishers = sorted(
+      {
+          str(p).strip()
+          for p in books_df["publisher"].dropna()
+          if str(p).strip() != ""
+      }
+  )
+
+  col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
   with col_s1:
     search_query = st.text_input(
         "Kitap veya Yazar Ara",
@@ -416,55 +471,78 @@ with tab2:
         key="lib_search",
     )
   with col_s2:
+    pub_filter = st.selectbox(
+        "Yayınevi Filtrele", ["Tümü"] + all_publishers, key="lib_pub_select"
+    )
+  with col_s3:
     cat_filter = st.selectbox(
         "Kategori Filtrele",
         ["Tümü"]
         + sorted(
-            {b.get("category", "") for b in books_df.to_dict("records") if b.get("category")}
+            {
+                b.get("category", "")
+                for b in books_df.to_dict("records")
+                if b.get("category")
+            }
         ),
         key="lib_cat",
     )
 
   filtered_lib = books_df.copy()
+
+  # Yayınevi filtresi
+  if pub_filter != "Tümü":
+    filtered_lib = filtered_lib[filtered_lib["publisher"] == pub_filter]
+
+  # Arama filtresi
   if search_query:
+    q = search_query.strip()
     filtered_lib = filtered_lib[
-        filtered_lib["title"].str.contains(search_query, case=False, na=False)
-        | filtered_lib["author"].str.contains(search_query, case=False, na=False)
+        filtered_lib["title"]
+        .astype(str)
+        .str.contains(q, case=False, na=False)
+        | filtered_lib["author"]
+        .astype(str)
+        .str.contains(q, case=False, na=False)
     ]
+
+  # Kategori filtresi
   if cat_filter != "Tümü":
     filtered_lib = filtered_lib[filtered_lib["category"] == cat_filter]
+
+  # Kitap adına göre alfabetik sırala
+  filtered_lib = filtered_lib.sort_values(by="title", ascending=True)
 
   st.write(f"📚 Toplam **{len(filtered_lib)}** kitap listeleniyor.")
 
   for start in range(0, len(filtered_lib), 4):
     cols = st.columns(4)
-    for c, (_, b) in zip(
-        cols, filtered_lib.iloc[start : start + 4].iterrows()
-    ):
-      with c:
+    chunk = filtered_lib.iloc[start : start + 4]
+    for c_idx, (_, b) in enumerate(chunk.iterrows()):
+      with cols[c_idx]:
         c_img = cover(b.get("cover_url"))
         img_html = (
             f'<img src="{c_img}" style="height: 130px; object-fit: contain;'
-            ' border-radius: 8px; margin-bottom: 8px;">'
+            ' border-radius: 8px; margin-bottom: 8px; display: block;'
+            ' margin-left: auto; margin-right: auto;">'
             if c_img
-            else '<div style="font-size: 3.5rem; margin-bottom: 8px;">📘</div>'
+            else '<div style="font-size: 3.5rem; margin-bottom: 8px; text-align: center;">📘</div>'
         )
 
         st.markdown(
             f"""
-            <div style="background: white; border-radius: 20px; padding: 15px; border: 1px solid #e2e8f0; height: 320px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; align-items: center;">
+            <div style="background: white; border-radius: 20px; padding: 15px; border: 1px solid #e2e8f0; height: 240px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; align-items: center;">
                 <div>
                     {img_html}
-                    <h4 style="font-size: 1.05rem; color: #1e293b; margin: 5px 0; font-weight: 700; line-height: 1.3;">{b['title']}</h4>
-                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">{b.get('author', 'Bilinmiyor')}</p>
-                </div>
-                <div>
-                    <span style="display: inline-block; background: #e0e7ff; color: #4338ca; border-radius: 99px; padding: 3px 10px; font-size: 0.75rem; font-weight: 600;">{b.get('category', '')}</span>
+                    <h4 style="font-size: 1rem; color: #1e293b; margin: 5px 0; font-weight: 700; line-height: 1.2;">{b['title']}</h4>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+        if st.button("🔍 Detaylar", key=f"det_{b['id']}", use_container_width=True):
+          show_book_detail(b["id"])
 
 # 3. SEKME: OKUMA YOLCULUĞU
 with tab3:
@@ -512,10 +590,12 @@ with tab4:
 
     st.markdown("---")
 
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4 = st.tabs([
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6 = st.tabs([
         "➕ Yeni Kitap Ekle",
         "✏️ Kapakları Hızlı Düzenle",
-        "📊 Okuma Geçmişi ve Raporlar",
+        "↩️ Okunmayı Geri Al",
+        "📊 Okuma Özeti",
+        "📝 Ham Log Geçmişi",
         "🧹 Sıfırlama Araçları",
     ])
 
@@ -525,6 +605,7 @@ with tab4:
         new_t = st.text_input("Kitap Adı")
         new_a = st.text_input("Yazar")
         new_p = st.text_input("Yayınevi")
+        new_isbn = st.text_input("ISBN Numarası")
         new_c = st.selectbox(
             "Kategori",
             ["Hikaye", "Bilgi & Keşif", "Aktivite", "İlk Okuma", "Duygular & Yaşam"],
@@ -538,14 +619,15 @@ with tab4:
             bid = "MAN-" + uuid.uuid4().hex[:8].upper()
             con = sqlite3.connect(DB_NAME)
             con.execute(
-                "INSERT INTO books (id, title, author, publisher, category, age,"
-                " pages, cover_url, read_count, created_at) VALUES (?, ?, ?, ?, ?, ?,"
+                "INSERT INTO books (id, title, author, publisher, isbn, category, age,"
+                " pages, cover_url, read_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?,"
                 " ?, ?, 0, ?)",
                 (
                     bid,
                     new_t,
                     new_a,
                     new_p,
+                    new_isbn,
                     new_c,
                     new_ag,
                     new_pg,
@@ -561,10 +643,6 @@ with tab4:
 
     with adm_tab2:
       st.subheader("✏️ Eksik veya Hatalı Kapakları Hızlı Düzenle")
-      st.markdown(
-          "Aşağıdan dilediğin kitabın kapak URL adresini güncelleyebilirsin."
-      )
-
       missing_cover_books = books_df[
           books_df["cover_url"].isna() | (books_df["cover_url"] == "")
       ]
@@ -592,7 +670,66 @@ with tab4:
         st.success("Harika! Kapaksız kitap kalmadı. 🎉")
 
     with adm_tab3:
-      st.subheader("📖 Okunma Detayları ve Geçmişi")
+      st.subheader("↩️ Okunmuş Kitabı Geri Al (Okunmadı Yap)")
+      read_books_df = books_df[books_df["read_count"] > 0]
+      if len(read_books_df) > 0:
+        for _, rb in read_books_df.iterrows():
+          col_rb1, col_rb2 = st.columns([3, 1])
+          with col_rb1:
+            st.write(f"📖 **{rb['title']}** (Okunma: {rb['read_count']})")
+          with col_rb2:
+            if st.button("Geri Al", key=f"undo_read_{rb['id']}"):
+              con = sqlite3.connect(DB_NAME)
+              con.execute(
+                  "UPDATE books SET read_count = 0 WHERE id = ?", (rb["id"],)
+              )
+              con.execute(
+                  "DELETE FROM reading_log WHERE book_id = ?", (rb["id"],)
+              )
+              con.commit()
+              con.close()
+              st.success(f"'{rb['title']}' okunmadı olarak işaretlendi!")
+              st.cache_data.clear()
+              st.rerun()
+      else:
+        st.info("Okundu olarak işaretlenmiş kitap bulunmuyor.")
+
+    with adm_tab4:
+      st.subheader("📊 Okuma Geçmişi Özeti")
+      logs_list = rows("reading_log")
+      summary_map = {}
+      for l in logs_list:
+        bid = l.get("book_id")
+        rat = l.get("read_at", "")
+        if bid not in summary_map:
+          summary_map[bid] = {"count": 0, "last_read": ""}
+        summary_map[bid]["count"] += 1
+        if rat > summary_map[bid]["last_read"]:
+          summary_map[bid]["last_read"] = rat
+
+      summary_data = []
+      for _, b in books_df.iterrows():
+        b_id = b["id"]
+        if b_id in summary_map:
+          summary_data.append({
+              "Kitap Adı": b["title"],
+              "Yazar": b.get("author", "Bilinmiyor"),
+              "Toplam Okunma": summary_map[b_id]["count"],
+              "En Son Okunma Tarihi": summary_map[b_id]["last_read"][:19].replace(
+                  "T", " "
+              ),
+          })
+
+      if summary_data:
+        df_summary = pd.DataFrame(summary_data).sort_values(
+            by="En Son Okunma Tarihi", ascending=False
+        )
+        st.dataframe(df_summary, use_container_width=True)
+      else:
+        st.info("Henüz özetlenecek okunmuş kitap bulunmuyor.")
+
+    with adm_tab5:
+      st.subheader("📝 Ham Okuma Log Geçmişi")
       logs = rows("reading_log")
       books_list = rows("books")
       book_dict = {b["id"]: b for b in books_list}
@@ -612,14 +749,7 @@ with tab4:
       else:
         st.info("Henüz hiçbir kitap okunmadı.")
 
-      st.markdown("---")
-      st.subheader("📚 Kitap Bazlı Okunma Sayıları")
-      read_summary = books_df[
-          ["title", "author", "category", "read_count"]
-      ].sort_values(by="read_count", ascending=False)
-      st.dataframe(read_summary, use_container_width=True)
-
-    with adm_tab4:
+    with adm_tab6:
       st.subheader("🧹 Veri Sıfırlama")
       st.warning(
           "Bu buton veritabanındaki tüm okuma sayaçlarını ve okuma geçmişini"
