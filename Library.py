@@ -741,14 +741,17 @@ with tab4:
 
     st.markdown("---")
 
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6 = st.tabs([
-        "➕ Yeni Kitap Ekle",
-        "✏️ Kapakları Hızlı Düzenle",
-        "↩️ Okunmayı Geri Al",
-        "📊 Okuma Özeti",
-        "📝 Ham Log Geçmişi",
-        "🧹 Sıfırlama Araçları",
-    ])
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = (
+        st.tabs([
+            "➕ Yeni Kitap Ekle",
+            "✏️ Kapakları Hızlı Düzenle",
+            "↩️ Okunmayı Geri Al",
+            "📊 Okuma Özeti",
+            "📝 Ham Log Geçmişi",
+            "🧹 Sıfırlama Araçları",
+            "💾 Veritabanı Yedek",
+        ])
+    )
 
     with adm_tab1:
       with st.form("admin_add_form"):
@@ -800,7 +803,6 @@ with tab4:
           key="cover_search_input",
       )
 
-      # Filtreleme mantığı
       if cover_search_query.strip():
         q_clean = cover_search_query.strip()
         filtered_cover_books = books_df[
@@ -812,7 +814,6 @@ with tab4:
             .str.contains(q_clean, case=False, na=False)
         ]
       else:
-        # Arama yapılmadıysa varsayılan olarak kapaksızları göster veya ilk 20 kitabı göster
         filtered_cover_books = books_df[
             books_df["cover_url"].isna() | (books_df["cover_url"] == "")
         ]
@@ -957,3 +958,22 @@ with tab4:
         st.success("Tüm okuma karnesi başarıyla sıfırlandı!")
         st.cache_data.clear()
         st.rerun()
+
+    with adm_tab7:
+      st.subheader("💾 Canlı Veritabanı Yedeğini İndir")
+      st.info(
+          "Canlı sunucuda yapılan okumaları ve güncellemeleri kaybetmemek için"
+          " bu butona basarak veritabanı yedeğini (`atlas_library.db`) indirebilir"
+          " ve lokal bilgisayarınıza taşıyabilirsiniz."
+      )
+      if os.path.exists(DB_NAME):
+        with open(DB_NAME, "rb") as f:
+          st.download_button(
+              label="📥 atlas_library.db Dosyasını İndir",
+              data=f,
+              file_name="atlas_library.db",
+              mime="application/x-sqlite3",
+              use_container_width=True,
+          )
+      else:
+        st.warning("Veritabanı dosyası bulunamadı.")
