@@ -249,7 +249,7 @@ with st.sidebar:
   )
 
   st.markdown("---")
-  st.caption("🏰 Atlas'ın Sihirli Kütüphanesi v2.7")
+  st.caption("🏰 Atlas'ın Sihirli Kütüphanesi v2.8")
 
 # --- ÜST HERO ALANI ---
 st.markdown(
@@ -741,17 +741,25 @@ with tab4:
 
     st.markdown("---")
 
-    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5, adm_tab6, adm_tab7 = (
-        st.tabs([
-            "➕ Yeni Kitap Ekle",
-            "✏️ Kapakları Hızlı Düzenle",
-            "↩️ Okunmayı Geri Al",
-            "📊 Okuma Özeti",
-            "📝 Ham Log Geçmişi",
-            "🧹 Sıfırlama Araçları",
-            "💾 Veritabanı Yedek",
-        ])
-    )
+    (
+        adm_tab1,
+        adm_tab2,
+        adm_tab3,
+        adm_tab4,
+        adm_tab5,
+        adm_tab6,
+        adm_tab7,
+        adm_tab8,
+    ) = st.tabs([
+        "➕ Yeni Kitap Ekle",
+        "✏️ Kitap Düzenle",
+        "🎨 Kapakları Düzenle",
+        "↩️ Okunmayı Geri Al",
+        "📊 Okuma Özeti",
+        "📝 Ham Log",
+        "🧹 Sıfırlama",
+        "💾 Veritabanı Yedek",
+    ])
 
     with adm_tab1:
       with st.form("admin_add_form"):
@@ -796,7 +804,95 @@ with tab4:
             st.rerun()
 
     with adm_tab2:
-      st.subheader("✏️ Tüm Kütüphane Kapak Düzenleme ve Arama")
+      st.subheader("✏️ Kitap Künyesini Düzenle (Ad, Yazar, Yayınevi vb.)")
+      edit_search_q = st.text_input(
+          "🔍 Düzenlenecek Kitabı Ara",
+          placeholder="Kitap veya yazar adı yazın...",
+          key="edit_book_search",
+      )
+
+      if edit_search_q.strip():
+        eq = edit_search_q.strip()
+        matched_edit_books = books_df[
+            books_df["title"]
+            .astype(str)
+            .str.contains(eq, case=False, na=False)
+            | books_df["author"]
+            .astype(str)
+            .str.contains(eq, case=False, na=False)
+        ]
+      else:
+        matched_edit_books = pd.DataFrame()
+        st.info(
+            "💡 Düzenlemek istediğiniz kitabı bulmak için yukarıdaki arama"
+            " çubuğuna adını veya yazarını yazın."
+        )
+
+      if len(matched_edit_books) > 0:
+        st.write(
+            f"📚 Eşleşen Kitap Sayısı: **{len(matched_edit_books)}**"
+        )
+        for _, eb in matched_edit_books.iterrows():
+          with st.form(f"edit_book_form_{eb['id']}"):
+            st.markdown(f"### 📖 {eb['title']}")
+            up_title = st.text_input("Kitap Adı", value=eb["title"])
+            up_author = st.text_input(
+                "Yazar", value=str(eb.get("author", ""))
+            )
+            up_pub = st.text_input(
+                "Yayınevi", value=str(eb.get("publisher", ""))
+            )
+
+            cat_list = [
+                "Hikaye",
+                "Bilgi & Keşif",
+                "Aktivite",
+                "İlk Okuma",
+                "Duygular & Yaşam",
+            ]
+            current_cat = eb.get("category", "Hikaye")
+            cat_idx = (
+                cat_list.index(current_cat) if current_cat in cat_list else 0
+            )
+            up_cat = st.selectbox("Kategori", cat_list, index=cat_idx)
+
+            up_age = st.text_input("Yaş Grubu", value=str(eb.get("age", "5+")))
+            try:
+              p_val = int(eb.get("pages", 32) or 32)
+            except Exception:
+              p_val = 32
+            up_pages = st.number_input(
+                "Sayfa Sayısı", min_value=1, value=p_val
+            )
+
+            if st.form_submit_button(
+                "💾 Değişiklikleri Kaydet", use_container_width=True
+            ):
+              con = sqlite3.connect(DB_NAME)
+              con.execute(
+                  """
+                            UPDATE books 
+                            SET title = ?, author = ?, publisher = ?, category = ?, age = ?, pages = ?
+                            WHERE id = ?
+                        """,
+                  (
+                      up_title,
+                      up_author,
+                      up_pub,
+                      up_cat,
+                      up_age,
+                      up_pages,
+                      eb["id"],
+                  ),
+              )
+              con.commit()
+              con.close()
+              st.success(f"'{up_title}' başarıyla güncellendi! 🎉")
+              st.cache_data.clear()
+              st.rerun()
+
+    with adm_tab3:
+      st.subheader("🎨 Tüm Kütüphane Kapak Düzenleme ve Arama")
       cover_search_query = st.text_input(
           "🔍 Kitap veya Yazar Adına Göre Ara",
           placeholder="Örn: Denizler Altında",
@@ -858,8 +954,13 @@ with tab4:
       else:
         st.info("Aramanıza uygun kitap bulunamadı.")
 
-    with adm_tab3:
-      st.subheader("↩️ Okunmuş Kitabı Geri Al (Okunmadı Yap)")
+    # GÜNCELLENEN SEKME: SADECE SON OKUMAYI GERİ AL (SAYAÇTAN 1 DÜŞ)
+    with adm_tab4:
+      st.subheader("↩️ En Son Okumayı Geri Al")
+      st.info(
+          "Bu işlem, ilgili kitabın sadece **en son okuma kaydını** siler ve"
+          " okunma sayacından 1 düşer."
+      )
       read_books_df_adm = books_df[books_df["read_count"] > 0]
       if len(read_books_df_adm) > 0:
         for _, rb in read_books_df_adm.iterrows():
@@ -870,23 +971,36 @@ with tab4:
                 f" {int(rb['read_count'])})"
             )
           with col_rb2:
-            if st.button("Sıfırla", key=f"undo_read_{rb['id']}"):
+            if st.button("Son Okumayı Geri Al", key=f"undo_read_{rb['id']}"):
               con = sqlite3.connect(DB_NAME)
+              # Sadece en son eklenen log kaydını bul ve sil
+              last_log = con.execute(
+                  "SELECT id FROM reading_log WHERE book_id = ? ORDER BY"
+                  " read_at DESC LIMIT 1",
+                  (rb["id"],),
+              ).fetchone()
+              if last_log:
+                con.execute(
+                    "DELETE FROM reading_log WHERE id = ?", (last_log[0],)
+                )
+              # Sayaçtan 1 düş (0'ın altına düşmemesini sağla)
               con.execute(
-                  "UPDATE books SET read_count = 0 WHERE id = ?", (rb["id"],)
-              )
-              con.execute(
-                  "DELETE FROM reading_log WHERE book_id = ?", (rb["id"],)
+                  "UPDATE books SET read_count = MAX(0, read_count - 1) WHERE id"
+                  " = ?",
+                  (rb["id"],),
               )
               con.commit()
               con.close()
-              st.success(f"'{rb['title']}' okunma sayacı sıfırlandı!")
+              st.success(
+                  f"'{rb['title']}' için son okuma geri alındı ve sayaç"
+                  " güncellendi!"
+              )
               st.cache_data.clear()
               st.rerun()
       else:
         st.info("Okundu olarak işaretlenmiş kitap bulunmuyor.")
 
-    with adm_tab4:
+    with adm_tab5:
       st.subheader("📊 Okuma Geçmişi Özeti")
       logs_list = rows("reading_log")
       summary_map = {}
@@ -920,7 +1034,7 @@ with tab4:
       else:
         st.info("Henüz özetlenecek okunmuş kitap bulunmuyor.")
 
-    with adm_tab5:
+    with adm_tab6:
       st.subheader("📝 Ham Okuma Log Geçmişi (Okunma Sayısı Dahil)")
       logs = rows("reading_log")
       books_list = rows("books")
@@ -943,7 +1057,7 @@ with tab4:
       else:
         st.info("Henüz hiçbir kitap okunmadı.")
 
-    with adm_tab6:
+    with adm_tab7:
       st.subheader("🧹 Veri Sıfırlama")
       st.warning(
           "Bu buton veritabanındaki tüm okuma sayaçlarını ve okuma geçmişini"
@@ -959,7 +1073,7 @@ with tab4:
         st.cache_data.clear()
         st.rerun()
 
-    with adm_tab7:
+    with adm_tab8:
       st.subheader("💾 Canlı Veritabanı Yedeğini İndir")
       st.info(
           "Canlı sunucuda yapılan okumaları ve güncellemeleri kaybetmemek için"
