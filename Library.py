@@ -17,17 +17,16 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (Üst Boşlukları Sıfırlama ve Tam Görünürlük Optimizasyonu) ---
+# --- CSS STİLLERİ (Hizalama ve Görsel Optimizasyonlar v6.0) ---
 st.markdown(
     """
 <style>
-    /* Streamlit varsayılan üst boşluklarını ve header alanını tamamen sıfırla */
     header[data-testid="stHeader"] {
         background: transparent !important;
         height: 0px !important;
     }
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 0.4rem !important;
         padding-bottom: 1rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -48,21 +47,21 @@ st.markdown(
         padding-bottom: 0px !important;
     }
     
-    /* iPad ekranına tam sığması için optimize edilmiş mor banner */
+    /* Mor Banner Optimizasyonu */
     .hero-container {
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
         border-radius: 14px;
-        padding: 10px 16px;
+        padding: 12px 18px;
         color: white;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-        margin-bottom: 6px;
         height: 100%;
+        min-height: 95px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
     .hero-container h1 {
-        font-size: 1.45rem;
+        font-size: 1.4rem;
         font-weight: 900;
         margin-bottom: 2px;
     }
@@ -71,6 +70,7 @@ st.markdown(
         opacity: 0.95;
         font-weight: 500;
         margin-bottom: 0px;
+        line-height: 1.3;
     }
     
     .sidebar-card {
@@ -87,7 +87,7 @@ st.markdown(
         border-radius: 10px;
         font-size: 0.78rem !important;
         font-weight: 700;
-        padding: 5px 4px !important;
+        padding: 6px 4px !important;
         width: 100%;
         color: #ffffff !important;
         background-color: #6366f1;
@@ -103,7 +103,7 @@ st.markdown(
         background-color: #4f46e5;
     }
 
-    /* Kart içindeki butonları kesin olarak ortalamak için kapsayıcı */
+    /* Kart içindeki butonları ortalama kapsayıcısı */
     .centered-button-container {
         display: flex;
         justify-content: center;
@@ -354,7 +354,7 @@ with st.sidebar:
             <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
         </div>
         <div style="text-align: center; margin-top: 1px;">
-            <span style="font-size: 0.55rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v5.9</span>
+            <span style="font-size: 0.55rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v6.0</span>
         </div>
     """,
       unsafe_allow_html=True,
@@ -451,7 +451,7 @@ if active_page == "Ana Sayfa":
         """
             <div class="hero-container">
                 <h1>Merhaba Atlas! 👋</h1>
-                <p>Bugün hangi harika maceraya yelken açmak istersin? Her kitap seni yeni bir maceraya götürür. ✨</p>
+                <p>Bugün hangi harika maceraya yelken açmak istersin? ✨ Her kitap seni yeni bir dünyaya götürür.</p>
             </div>
         """,
         unsafe_allow_html=True,
@@ -463,7 +463,10 @@ if active_page == "Ana Sayfa":
     else:
       pool_df = books_df
 
-    # SİHİRLİ ÇARK: 2 KİTAP ÖNERİR
+    # SİHİRLİ ÇARK: 2 KİTAP ÖNERİR (Hizalama boşlukları düzenlendi)
+    st.markdown(
+        "<div style='height: 2px;'></div>", unsafe_allow_html=True
+    )
     if st.button("🎡 Sihirli Çarkı Çevir", use_container_width=True):
       if len(pool_df) > 0:
         unread_pool = pool_df[pool_df["read_count"] == 0]
@@ -475,7 +478,7 @@ if active_page == "Ana Sayfa":
       st.rerun()
 
     st.markdown(
-        "<div style='height: 3px;'></div>", unsafe_allow_html=True
+        "<div style='height: 4px;'></div>", unsafe_allow_html=True
     )
     # RASTGELE ÖNER: 4 KİTAP ÖNERİR
     if st.button("📚 Rastgele Kitap Öner", use_container_width=True):
@@ -602,7 +605,7 @@ if active_page == "Ana Sayfa":
               unsafe_allow_html=True,
           )
 
-          # Butonu kesin olarak ortalayan CSS sınıflı sarmalayıcı
+          # Butonu ortalayan kapsayıcı
           st.markdown(
               '<div class="centered-button-container">', unsafe_allow_html=True
           )
