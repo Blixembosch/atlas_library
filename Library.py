@@ -745,6 +745,7 @@ with tab4:
         adm_tab1,
         adm_tab2,
         adm_tab3,
+        adm_missing_covers,
         adm_tab4,
         adm_tab5,
         adm_tab6,
@@ -754,6 +755,7 @@ with tab4:
         "➕ Yeni Kitap Ekle",
         "✏️ Kitap Düzenle",
         "🎨 Kapakları Düzenle",
+        "🖼️ Görseli Olmayanlar",
         "↩️ Okunmayı Geri Al",
         "📊 Okuma Özeti",
         "📝 Ham Log",
@@ -954,7 +956,46 @@ with tab4:
       else:
         st.info("Aramanıza uygun kitap bulunamadı.")
 
-    # GÜNCELLENEN SEKME: SADECE SON OKUMAYI GERİ AL (SAYAÇTAN 1 DÜŞ)
+    # YENİ EKLENEN SEKME: GÖRSELİ EKSİK OLAN KİTAPLAR
+    with adm_missing_covers:
+      st.subheader("🖼️ Görseli Eksik Olan Kitaplar Listesi")
+      st.info(
+          "Aşağıda kapak görseli (cover_url) boş veya geçersiz olan tüm kitaplar"
+          " listelenmektedir. Hızlıca eksik görselleri tamamlayabilirsiniz."
+      )
+
+      missing_df = books_df[
+          books_df["cover_url"].isna() | (books_df["cover_url"] == "")
+      ]
+      st.write(f"🖼️ Görseli Olmayan Kitap Sayısı: **{len(missing_df)}**")
+
+      if len(missing_df) > 0:
+        for _, mb in missing_df.iterrows():
+          with st.form(f"missing_cover_form_{mb['id']}"):
+            st.write(
+                f"📖 **{mb['title']}** — *{mb.get('author', 'Bilinmiyor')}*"
+                f" ({mb.get('category', '-')})"
+            )
+            new_missing_url = st.text_input(
+                "Yeni Kapak URL", key=f"missing_url_{mb['id']}"
+            )
+            if st.form_submit_button("Kapak Ekle"):
+              con = sqlite3.connect(DB_NAME)
+              con.execute(
+                  "UPDATE books SET cover_url = ? WHERE id = ?",
+                  (new_missing_url, mb["id"]),
+              )
+              con.commit()
+              con.close()
+              st.success(f"'{mb['title']}' için kapak kaydedildi! 🎉")
+              st.cache_data.clear()
+              st.rerun()
+      else:
+        st.success(
+            "Tebrikler! Kütüphanenizde görseli eksik olan hiç kitap kalmamış!"
+            " 🎉"
+        )
+
     with adm_tab4:
       st.subheader("↩️ En Son Okumayı Geri Al")
       st.info(
@@ -973,7 +1014,6 @@ with tab4:
           with col_rb2:
             if st.button("Son Okumayı Geri Al", key=f"undo_read_{rb['id']}"):
               con = sqlite3.connect(DB_NAME)
-              # Sadece en son eklenen log kaydını bul ve sil
               last_log = con.execute(
                   "SELECT id FROM reading_log WHERE book_id = ? ORDER BY"
                   " read_at DESC LIMIT 1",
@@ -983,7 +1023,6 @@ with tab4:
                 con.execute(
                     "DELETE FROM reading_log WHERE id = ?", (last_log[0],)
                 )
-              # Sayaçtan 1 düş (0'ın altına düşmemesini sağla)
               con.execute(
                   "UPDATE books SET read_count = MAX(0, read_count - 1) WHERE id"
                   " = ?",
