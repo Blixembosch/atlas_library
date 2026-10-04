@@ -18,7 +18,7 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (v0.6.4 - İnce Kategori Butonları) ---
+# --- CSS STİLLERİ (v0.6.5 - Ana Sayfada Aktivite Butonu Gizlendi) ---
 st.markdown(
     """
 <style>
@@ -63,7 +63,7 @@ section[data-testid="stSidebar"] div.stButton>button:hover{border-color:var(--pr
 .xp-fill{background:linear-gradient(90deg,#4F7CFF,#7C4DFF);height:100%;border-radius:99px;}
 .xp-text{font-size:.8rem;font-weight:600;}
 
-/* Category cards (Kısaltılmış, ince ve zarif görünüm) */
+/* Category cards */
 div[class*="st-key-cat_"] button,div[class*="st-key-catON_"] button{background:#fff;color:#1e293b!important;
   border:1px solid #e2e8f0;border-radius:16px;box-shadow:var(--shadow);min-height:64px;padding:6px 8px !important;white-space:normal;}
 div[class*="st-key-cat_"] button p,div[class*="st-key-catON_"] button p{margin:0;line-height:1.2;font-size:0.82rem;}
@@ -331,7 +331,7 @@ with st.sidebar:
       ("🏠", "Ana Sayfa"),
       ("📖", "Kütüphane"),
       ("🏆", "Okuma Yolculuğu"),
-      ("🎖️️", "Rozetler"),
+      ("🎖️", "Rozetler"),
       ("⚙️", "Yönetici Paneli"),
   ]
 
@@ -389,7 +389,7 @@ with st.sidebar:
           f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
           f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
           f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
-          '<div class="side-ver">Atlas v0.6.4</div>',
+          '<div class="side-ver">Atlas v0.6.5</div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -525,9 +525,10 @@ if active_page == "Ana Sayfa":
   st.caption("🌙 Saat 19:00’dan sonra uyku öncesi huzur için Aktivite haricindeki tüm kitaplar seçilir.")
 
   st.markdown("#### ✨ Keşfetmek İstediğin Dünyayı Seç")
+  # Aktivite kategorisi ana sayfa buton listesinden çıkarıldı, ancak DB ve diğer sayfalarda aktif.
   categories = [
       ("🌟", "Tümü", "Tümü"), ("🐉", "Hikaye", "Hikaye"),
-      ("🚀", "Bilgi", "Bilgi & Keşif"), ("🦁", "Aktivite", "Aktivite"),
+      ("🚀", "Bilgi", "Bilgi & Keşif"),
       ("💡", "İlk Okuma", "İlk Okuma"), ("🌍", "Doğa", "Doğa & Hayvanlar"),
       ("🔬", "Bilim", "Bilim"),
   ]
