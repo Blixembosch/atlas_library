@@ -17,7 +17,7 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (Sidebar Dikey Sığdırma Optimizasyonu) ---
+# --- CSS STİLLERİ ---
 st.markdown(
     """
 <style>
@@ -28,58 +28,62 @@ st.markdown(
     section[data-testid="stSidebar"] {
         background-color: #f8fafc !important;
         border-right: 1px solid #e2e8f0;
-        padding-top: 5px !important;
-        padding-bottom: 5px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
     section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 5px !important;
-        padding-bottom: 5px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
     
     .hero-container {
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
-        border-radius: 28px;
-        padding: 35px;
+        border-radius: 20px;
+        padding: 20px 25px;
         color: white;
-        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.25);
-        margin-bottom: 25px;
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
+        margin-bottom: 15px;
         height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
     .hero-container h1 {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 900;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
     }
     .hero-container p {
-        font-size: 1.15rem;
+        font-size: 1rem;
         opacity: 0.95;
         font-weight: 500;
+        margin-bottom: 0px;
     }
     
     .sidebar-card {
         background: #ffffff;
-        border-radius: 12px;
-        padding: 8px 10px;
+        border-radius: 10px;
+        padding: 6px 8px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         text-align: center;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
 
     div.stButton > button {
-        border-radius: 12px;
-        font-size: 0.88rem;
+        border-radius: 10px;
+        font-size: 0.78rem !important;
         font-weight: 700;
-        padding: 8px 12px;
+        padding: 6px 4px !important;
         width: 100%;
         color: #ffffff !important;
         background-color: #6366f1;
         border: none;
-        box-shadow: 0 3px 10px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2);
         transition: all 0.2s ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     div.stButton > button:hover {
         transform: translateY(-2px);
@@ -93,8 +97,12 @@ st.markdown(
 
 def akilli_kategori_belirle(title, author, subcategory=""):
   t = str(title).lower()
+  a = str(author).lower()
   sub = str(subcategory).lower()
-  combined = f"{t} {sub}"
+  combined = f"{t} {a} {sub}"
+
+  if "çin ali" in combined or "cin ali" in combined:
+    return "İlk Okuma"
 
   bilim_kelimeler = [
       "bilim",
@@ -180,10 +188,8 @@ def db():
     smart = akilli_kategori_belirle(
         b["title"], b["author"], b["subcategory"]
     )
-    if smart == "Bilim":
-      con.execute(
-          "UPDATE books SET category = 'Bilim' WHERE id = ?", (b["id"],)
-      )
+    if smart:
+      con.execute("UPDATE books SET category = ? WHERE id = ?", (smart, b["id"]))
   con.commit()
 
   return con
@@ -230,20 +236,22 @@ if "admin_logged_in" not in st.session_state:
   st.session_state.admin_logged_in = False
 if "nav_page" not in st.session_state:
   st.session_state.nav_page = "Ana Sayfa"
+if "home_active_category" not in st.session_state:
+  st.session_state.home_active_category = "Tümü"
 
-# --- SOL KENAR ÇUBUĞU (TEK SAYFAYA SIĞACAK ŞEKİLDE OPTİMİZE EDİLDİ) ---
+# --- SOL KENAR ÇUBUĞU ---
 with st.sidebar:
   st.markdown(
       """
-        <div style="text-align: center; margin-bottom: 2px;">
-            <div style="font-size: 3.2rem;">🏰</div>
-            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 1rem;">Atlas'ın Sihirli Kütüphanesi</h3>
-            <p style="color: #64748b; font-size: 0.75rem; margin: 1px 0;">Keşfet • Oku • Hayal Et</p>
+        <div style="text-align: center; margin-bottom: 0px;">
+            <div style="font-size: 2.5rem; line-height: 1.1;">🏰</div>
+            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 0.95rem;">Atlas'ın Sihirli Kütüphanesi</h3>
+            <p style="color: #64748b; font-size: 0.7rem; margin: 0px 0;">Keşfet • Oku • Hayal Et</p>
         </div>
     """,
       unsafe_allow_html=True,
   )
-  st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+  st.markdown("<hr style='margin: 3px 0;'>", unsafe_allow_html=True)
 
   menu_items = [
       ("🏠", "Ana Sayfa"),
@@ -262,10 +270,10 @@ with st.sidebar:
       st.session_state.nav_page = label
       st.rerun()
 
-  st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+  st.markdown("<hr style='margin: 3px 0;'>", unsafe_allow_html=True)
   st.markdown(
-      "<h5 style='color: #1e293b; font-size: 0.85rem; text-align:"
-      " center; margin: 2px 0;'>🏆 Okuma Künyesi</h5>",
+      "<h5 style='color: #1e293b; font-size: 0.8rem; text-align:"
+      " center; margin: 1px 0;'>🏆 Okuma Künyesi</h5>",
       unsafe_allow_html=True,
   )
 
@@ -310,19 +318,19 @@ with st.sidebar:
   st.markdown(
       f"""
         <div class="sidebar-card">
-            <span style="font-size: 0.75rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
-            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
+            <span style="font-size: 0.7rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
+            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
         </div>
         <div class="sidebar-card">
-            <span style="font-size: 0.75rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
-            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
+            <span style="font-size: 0.7rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
+            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
         </div>
         <div class="sidebar-card">
-            <span style="font-size: 0.75rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
-            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
+            <span style="font-size: 0.7rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
+            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
         </div>
-        <div style="text-align: center; margin-top: 2px;">
-            <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v4.7</span>
+        <div style="text-align: center; margin-top: 1px;">
+            <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v5.7</span>
         </div>
     """,
       unsafe_allow_html=True,
@@ -426,7 +434,7 @@ if active_page == "Ana Sayfa":
     )
   with col_h2:
     st.markdown(
-        "<div style='height: 15px;'></div>", unsafe_allow_html=True
+        "<div style='height: 5px;'></div>", unsafe_allow_html=True
     )
 
     now_check = datetime.now(TZ)
@@ -435,19 +443,21 @@ if active_page == "Ana Sayfa":
     else:
       pool_df = books_df
 
+    # SİHİRLİ ÇARK: 2 KİTAP ÖNERİR
     if st.button("🎡 Sihirli Çarkı Çevir", use_container_width=True):
       if len(pool_df) > 0:
         unread_pool = pool_df[pool_df["read_count"] == 0]
         target_pool = unread_pool if len(unread_pool) > 0 else pool_df
-        sample_n = min(4, len(target_pool))
+        sample_n = min(2, len(target_pool))
         st.session_state.current_featured_books = (
             target_pool.sample(n=sample_n).to_dict(orient="records")
         )
       st.rerun()
 
     st.markdown(
-        "<div style='height: 10px;'></div>", unsafe_allow_html=True
+        "<div style='height: 6px;'></div>", unsafe_allow_html=True
     )
+    # RASTGELE ÖNER: 4 KİTAP ÖNERİR
     if st.button("📚 Rastgele Kitap Öner", use_container_width=True):
       if len(pool_df) > 0:
         st.session_state.current_featured_books = (
@@ -456,12 +466,11 @@ if active_page == "Ana Sayfa":
         )
       st.rerun()
 
-  now = datetime.now(TZ)
-  if now.hour >= 19:
-    st.info(
-        "🌙 Saat 19:00’dan sonra uyku öncesi huzur için **Aktivite** haricindeki"
-        " tüm kitaplar seçiliyor[cite: 10]."
-    )
+  # 19:00 Sonrası Uyarı Notu
+  st.info(
+      "🌙 Saat 19:00’dan sonra uyku öncesi huzur için **Aktivite** haricindeki"
+      " tüm kitaplar seçiliyor."
+  )
 
   st.markdown("#### ✨ Keşfetmek İstediğin Dünyayı Seç")
 
@@ -469,47 +478,71 @@ if active_page == "Ana Sayfa":
   categories = [
       ("🌟", "Tümü"),
       ("🐉", "Hikaye"),
-      ("🚀", "Bilgi & Keşif"),
+      ("🚀", "Bilgi"),
       ("🦁", "Aktivite"),
       ("💡", "İlk Okuma"),
-      ("🌍", "Doğa & Hayvanlar"),
+      ("🌍", "Doğa"),
       ("🔬", "Bilim"),
   ]
 
   for idx, (icon, cat_key) in enumerate(categories):
     with cat_cols[idx]:
+      actual_cat = (
+          "Bilgi & Keşif"
+          if cat_key == "Bilgi"
+          else ("Doğa & Hayvanlar" if cat_key == "Doğa" else cat_key)
+      )
       if st.button(
-          f"{icon}\n{cat_key}",
+          f"{icon} {cat_key}",
           key=f"home_cat_{cat_key}",
           use_container_width=True,
       ):
-        st.session_state.selected_category = cat_key
-        st.session_state.nav_page = "Kütüphane"
+        st.session_state.home_active_category = actual_cat
+        if actual_cat == "Tümü":
+          sub_pool = pool_df
+        else:
+          sub_pool = pool_df[pool_df["category"] == actual_cat]
+
+        if len(sub_pool) > 0:
+          st.session_state.current_featured_books = (
+              sub_pool.sample(n=min(4, len(sub_pool)))
+              .to_dict(orient="records")
+          )
+        else:
+          st.session_state.current_featured_books = []
         st.rerun()
 
+  active_cat_label = st.session_state.home_active_category
   st.markdown("<br>", unsafe_allow_html=True)
-  st.markdown("#### ⭐ Senin İçin Seçtiklerimiz")
+  st.markdown(
+      f"#### ⭐ Senin İçin Seçtiklerimiz ({active_cat_label})"
+  )
 
   featured_books = st.session_state.current_featured_books
-  if not featured_books or len(featured_books) < 4:
+  if not featured_books or len(featured_books) == 0:
     default_pool = (
-        books_df[books_df["category"] != "Aktivite"]
-        if datetime.now(TZ).hour >= 19
-        else books_df
+        pool_df[pool_df["category"] == active_cat_label]
+        if active_cat_label != "Tümü"
+        else pool_df
     )
-    if len(default_pool) >= 4:
-      featured_books = default_pool.sample(n=4).to_dict(orient="records")
-    elif len(books_df) > 0:
-      featured_books = books_df.sample(
-          n=min(4, len(books_df))
+    n_default = 2 if len(featured_books) == 0 and len(default_pool) >= 2 else 4
+    if len(default_pool) >= n_default:
+      featured_books = default_pool.sample(n=n_default).to_dict(
+          orient="records"
+      )
+    elif len(default_pool) > 0:
+      featured_books = default_pool.to_dict(orient="records")
+    elif len(pool_df) > 0:
+      featured_books = pool_df.sample(
+          n=min(2, len(pool_df))
       ).to_dict(orient="records")
     st.session_state.current_featured_books = featured_books
 
   if featured_books:
-    home_cols = st.columns(4)
+    home_cols = st.columns(len(featured_books))
     current_books_df = get_books_df()
 
-    for idx, book in enumerate(featured_books[:4]):
+    for idx, book in enumerate(featured_books):
       with home_cols[idx]:
         b_live = current_books_df[current_books_df["id"] == book["id"]]
         read_cnt = (
@@ -544,18 +577,19 @@ if active_page == "Ana Sayfa":
           )
           st.markdown(
               f"<div style='font-size: 0.85rem; color: #64748b; text-align:"
-              f" center;'>✍️ {book.get('author', 'Bilinmiyor')}</div>",
-              unsafe_allow_html=True,
-          )
-          st.markdown(
-              f"<div style='font-size: 0.85rem; color: #64748b; text-align:"
               f" center; margin-bottom: 10px;'>🎯 Yaş: {book.get('age', '5+')} |"
               f" 🔄 Okunma: {read_cnt}</div>",
               unsafe_allow_html=True,
           )
 
+          # Butonu ortalamak için sarmalayıcı ekledik
+          st.markdown(
+              '<div style="display: flex; justify-content: center;">',
+              unsafe_allow_html=True,
+          )
           if st.button("🔍 Detay & Oku", key=f"home_det_{book['id']}"):
             show_book_detail(book["id"])
+          st.markdown("</div>", unsafe_allow_html=True)
 
 
 # 2. KÜTÜPHANE
@@ -807,7 +841,7 @@ elif active_page == "Yönetici Paneli":
         "✏️ Düzenle",
         "🎨 Kapaklar",
         "🖼️ Eksik Görseller",
-        "↩️ Geri Al",
+        "↩ Geri Al",
         "📊 Özet",
         "📝 Loglar",
         "🧹 Sıfırla",
