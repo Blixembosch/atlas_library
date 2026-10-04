@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+import html
 import os
 from pathlib import Path
 import random
@@ -17,106 +18,102 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (Hizalama ve Görsel Optimizasyonlar v6.0) ---
+# --- CSS STİLLERİ (v0.6.4 - İnce Kategori Butonları) ---
 st.markdown(
     """
 <style>
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        height: 0px !important;
-    }
-    .block-container {
-        padding-top: 0.4rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
+:root{--primary:#4F7CFF;--secondary:#7C4DFF;--r-card:24px;--r-btn:14px;--shadow:0 4px 20px rgba(0,0,0,.06);}
+header[data-testid="stHeader"]{background:transparent!important;height:0!important;}
+.block-container{padding:.8rem 1.2rem 1.5rem!important;max-width:1400px;}
+.stApp{background:#F8FAFC!important;color:#1e293b;}
+section[data-testid="stSidebar"]{background:#fff!important;border-right:1px solid #e2e8f0;}
 
-    .stApp {
-        background-color: #f8fafc !important;
-        color: #1e293b;
-    }
-    section[data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
-        border-right: 1px solid #e2e8f0;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-    }
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-    }
-    
-    /* Mor Banner Optimizasyonu */
-    .hero-container {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
-        border-radius: 14px;
-        padding: 12px 18px;
-        color: white;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-        height: 100%;
-        min-height: 95px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .hero-container h1 {
-        font-size: 1.4rem;
-        font-weight: 900;
-        margin-bottom: 2px;
-    }
-    .hero-container p {
-        font-size: 0.85rem;
-        opacity: 0.95;
-        font-weight: 500;
-        margin-bottom: 0px;
-        line-height: 1.3;
-    }
-    
-    .sidebar-card {
-        background: #ffffff;
-        border-radius: 10px;
-        padding: 5px 8px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        text-align: center;
-        margin-bottom: 3px;
-    }
+/* Buttons */
+div.stButton>button{border-radius:var(--r-btn);font-weight:700;color:#fff!important;border:none;
+  background:linear-gradient(135deg,var(--primary),var(--secondary));
+  box-shadow:0 4px 14px rgba(79,124,255,.25);padding:.55rem .8rem;transition:.2s;}
+div.stButton>button:hover{transform:translateY(-2px);filter:brightness(1.07);}
 
-    div.stButton > button {
-        border-radius: 10px;
-        font-size: 0.78rem !important;
-        font-weight: 700;
-        padding: 6px 4px !important;
-        width: 100%;
-        color: #ffffff !important;
-        background-color: #6366f1;
-        border: none;
-        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2);
-        transition: all 0.2s ease;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    div.stButton > button:hover {
-        transform: translateY(-2px);
-        background-color: #4f46e5;
-    }
+/* Sidebar */
+.side-logo{text-align:center;padding:10px 0 4px;}
+.side-logo-emoji{font-size:2.2rem;line-height:1.1;}
+.side-logo-title{font-weight:800;font-size:.95rem;color:#1e293b;}
+.side-logo-sub{font-size:.7rem;color:#64748b;}
+.side-label{font-size:.68rem;letter-spacing:.12em;color:#94a3b8;font-weight:800;margin:16px 0 6px;}
+.side-card{display:flex;justify-content:space-between;align-items:center;background:#F8FAFC;
+  border-radius:var(--r-btn);padding:9px 14px;margin-bottom:6px;font-size:.85rem;font-weight:700;color:#475569;}
+.side-card b{font-size:1.1rem;color:#1e293b;}
+.side-ver{text-align:center;font-size:.65rem;color:#94a3b8;margin-top:8px;}
+section[data-testid="stSidebar"] div.stButton>button{background:#fff;color:#1e293b!important;
+  border:1px solid #e2e8f0;box-shadow:none;justify-content:flex-start;}
+section[data-testid="stSidebar"] div.stButton>button:hover{border-color:var(--primary);color:var(--primary)!important;}
 
-    /* Kart içindeki butonları ortalama kapsayıcısı */
-    .centered-button-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-    }
-    .centered-button-container > div {
-        width: 90% !important;
-    }
+/* Hero */
+.st-key-hero_box{background:linear-gradient(135deg,#4F7CFF 0%,#7C4DFF 100%);border-radius:var(--r-card);
+  padding:22px 26px;box-shadow:var(--shadow);margin-bottom:18px;}
+.hero-title{font-size:1.8rem;font-weight:900;color:#fff;margin-bottom:2px;}
+.hero-sub{color:#fff;opacity:.95;margin:0 0 12px;font-weight:500;font-size:.95rem;}
+.hero-xp{color:#fff;font-size:.9rem;margin-bottom:14px;}
+.hero-xp .xp-track{background:rgba(255,255,255,.3);}
+.hero-xp .xp-fill{background:#fff;}
+.st-key-hero_box div.stButton>button{background:#fff;color:#4F7CFF!important;box-shadow:none;}
+
+/* XP bar (shared) */
+.xp-track{background:#e2e8f0;border-radius:99px;height:12px;overflow:hidden;margin:6px 0 4px;}
+.xp-fill{background:linear-gradient(90deg,#4F7CFF,#7C4DFF);height:100%;border-radius:99px;}
+.xp-text{font-size:.8rem;font-weight:600;}
+
+/* Category cards (Kısaltılmış, ince ve zarif görünüm) */
+div[class*="st-key-cat_"] button,div[class*="st-key-catON_"] button{background:#fff;color:#1e293b!important;
+  border:1px solid #e2e8f0;border-radius:16px;box-shadow:var(--shadow);min-height:64px;padding:6px 8px !important;white-space:normal;}
+div[class*="st-key-cat_"] button p,div[class*="st-key-catON_"] button p{margin:0;line-height:1.2;font-size:0.82rem;}
+div[class*="st-key-catON_"] button{border:2px solid #4F7CFF;}
+
+/* Book cards */
+.book-card{background:#fff;border-radius:var(--r-card);padding:12px;box-shadow:var(--shadow);border:1px solid #eef2f7;
+  display:flex;flex-direction:column;align-items:center;text-align:center;overflow:hidden;position:relative;margin-bottom:6px;}
+.book-cover{width:100%;display:flex;align-items:center;justify-content:center;background:#F1F5F9;border-radius:18px;overflow:hidden;}
+.book-cover img{height:100%;max-width:100%;object-fit:contain;}
+.book-badge{position:absolute;top:18px;left:18px;background:#fff;border-radius:99px;padding:3px 10px;
+  font-size:.72rem;font-weight:800;color:#7C4DFF;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.book-title{font-weight:800;font-size:.98rem;line-height:1.25;margin:10px 0 6px;height:2.5em;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.book-meta{font-size:.8rem;color:#64748b;line-height:1.7;}
+
+/* Recent adventures */
+.recent-item{background:#fff;border-radius:18px;padding:12px 18px;margin-bottom:8px;box-shadow:var(--shadow);
+  display:flex;justify-content:space-between;}
+.recent-item span{color:#94a3b8;font-size:.8rem;}
+
+/* Journey */
+.journey{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 14px;}
+.stop{flex:1;min-width:112px;border-radius:20px;padding:14px 8px;text-align:center;font-weight:800;border:2px solid;background:#fff;}
+.stop-icon{font-size:2rem;}
+.stop small{display:block;font-weight:600;font-size:.7rem;margin-top:4px;}
+.stop.done{background:#ECFDF5;border-color:#22C55E;color:#15803D;}
+.stop.now{background:#EEF3FF;border-color:#4F7CFF;color:#4F7CFF;box-shadow:0 0 0 4px rgba(79,124,255,.15);}
+.stop.lock{background:#F1F5F9;border-color:#E2E8F0;color:#94A3B8;}
+
+.stat-card{background:#fff;border-radius:var(--r-card);padding:18px;box-shadow:var(--shadow);margin-bottom:14px;}
+.stat-card small{color:#64748b;font-weight:800;}
+.stat-val{font-size:2rem;font-weight:900;color:#4F7CFF;}
+.cat-box{background:#fff;border-radius:var(--r-card);padding:16px;box-shadow:var(--shadow);}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
+ADMIN_CSS = """
+<style>
+div.stButton>button,div.stFormSubmitButton>button{background:#1E293B;color:#fff!important;border-radius:8px;box-shadow:none;border:none;}
+div.stButton>button:hover{transform:none;background:#334155;}
+[data-testid="stMetric"]{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.stTabs [data-baseweb="tab"]{font-weight:600;}
+.admin-head{border-bottom:1px solid #e2e8f0;margin-bottom:16px;padding-bottom:8px;}
+.admin-head h2{margin:0;font-size:1.4rem;color:#0F172A;}
+.admin-head p{margin:0;color:#64748b;font-size:.85rem;}
+</style>
+"""
 
 
 def akilli_kategori_belirle(title, author, subcategory=""):
@@ -263,25 +260,78 @@ if "nav_page" not in st.session_state:
 if "home_active_category" not in st.session_state:
   st.session_state.home_active_category = "Tümü"
 
+
+# XP / Seviye Sistem Fonksiyonları
+def calculate_level(total_read_books):
+  xp = total_read_books * 10
+  level = xp // 100 + 1
+  in_level = xp % 100
+  return {"xp": xp, "level": level, "pct": in_level, "to_next": 100 - in_level}
+
+
+def level_bar_html(lv):
+  return (
+      f'<div class="xp-track"><div class="xp-fill" style="width:{lv["pct"]}%"></div></div>'
+      f'<div class="xp-text">Seviye {lv["level"] + 1}\'e {lv["to_next"]} XP kaldı</div>'
+  )
+
+
+total_read_books = int((books_df["read_count"] > 0).sum())
+lvl = calculate_level(total_read_books)
+
+
+def get_pool_df():
+  df = get_books_df()
+  if datetime.now(TZ).hour >= 19:
+    df = df[df["category"] != "Aktivite"]
+  return df
+
+
+def spin_wheel():
+  pool = get_pool_df()
+  if len(pool) == 0:
+    return
+  unread = pool[pool["read_count"] == 0]
+  target = unread if len(unread) > 0 else pool
+  st.session_state.current_featured_books = target.sample(
+      n=min(2, len(target))
+  ).to_dict(orient="records")
+
+
+def random_pick():
+  pool = get_pool_df()
+  if len(pool) > 0:
+    st.session_state.current_featured_books = pool.sample(
+        n=min(4, len(pool))
+    ).to_dict(orient="records")
+
+
+def pick_category(cat):
+  st.session_state.home_active_category = cat
+  pool = get_pool_df()
+  sub = pool if cat == "Tümü" else pool[pool["category"] == cat]
+  st.session_state.current_featured_books = (
+      sub.sample(n=min(4, len(sub))).to_dict(orient="records")
+      if len(sub) > 0
+      else []
+  )
+
+
 # --- SOL KENAR ÇUBUĞU ---
 with st.sidebar:
   st.markdown(
-      """
-        <div style="text-align: center; margin-bottom: 0px;">
-            <div style="font-size: 2rem; line-height: 1.1;">🏰</div>
-            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 0.85rem;">Atlas'ın Sihirli Kütüphanesi</h3>
-            <p style="color: #64748b; font-size: 0.6rem; margin: 0px 0;">Keşfet • Oku • Hayal Et</p>
-        </div>
-    """,
+      '<div class="side-logo"><div class="side-logo-emoji">🏰</div>'
+      '<div class="side-logo-title">Atlas\'ın Sihirli Kütüphanesi</div>'
+      '<div class="side-logo-sub">Keşfet • Oku • Hayal Et</div></div>'
+      '<div class="side-label">NAVIGATION</div>',
       unsafe_allow_html=True,
   )
-  st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
 
   menu_items = [
       ("🏠", "Ana Sayfa"),
       ("📖", "Kütüphane"),
       ("🏆", "Okuma Yolculuğu"),
-      ("🎖️", "Rozetler"),
+      ("🎖️️", "Rozetler"),
       ("⚙️", "Yönetici Paneli"),
   ]
 
@@ -294,12 +344,7 @@ with st.sidebar:
       st.session_state.nav_page = label
       st.rerun()
 
-  st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
-  st.markdown(
-      "<h5 style='color: #1e293b; font-size: 0.7rem; text-align: center;"
-      " margin: 1px 0;'>🏆 Okuma Künyesi</h5>",
-      unsafe_allow_html=True,
-  )
+  st.markdown('<div class="side-label">OKUMA DURUMUM</div>', unsafe_allow_html=True)
 
   total_books = len(books_df)
   logs_data = rows("reading_log")
@@ -340,23 +385,12 @@ with st.sidebar:
         pass
 
   st.markdown(
-      f"""
-        <div class="sidebar-card">
-            <span style="font-size: 0.6rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
-            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
-        </div>
-        <div class="sidebar-card">
-            <span style="font-size: 0.6rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
-            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
-        </div>
-        <div class="sidebar-card">
-            <span style="font-size: 0.6rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
-            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
-        </div>
-        <div style="text-align: center; margin-top: 1px;">
-            <span style="font-size: 0.55rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v6.0</span>
-        </div>
-    """,
+      "".join([
+          f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
+          f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
+          f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
+          '<div class="side-ver">Atlas v0.6.4</div>',
+      ]),
       unsafe_allow_html=True,
   )
 
@@ -440,105 +474,80 @@ def show_book_detail(b_id):
     st.rerun()
 
 
+# Ortak Kitap Kartı
+def book_card(b, prefix, cover_h=170):
+  rc = int(b.get("read_count", 0) or 0)
+  img = cover(b.get("cover_url"))
+  cover_html = (
+      f'<img src="{html.escape(img)}">' if img else '<span style="font-size:4rem">📘</span>'
+  )
+  badge = "⭐ Çok Sevildi" if rc >= 3 else ("🏷️ Yeni" if rc == 0 else "")
+  badge_html = f'<div class="book-badge">{badge}</div>' if badge else ""
+  try:
+    pages = int(float(b.get("pages")))
+  except (TypeError, ValueError):
+    pages = "-"
+  st.markdown(
+      "".join([
+          f'<div class="book-card" style="height:{cover_h + 150}px">{badge_html}',
+          f'<div class="book-cover" style="height:{cover_h}px">{cover_html}</div>',
+          f'<div class="book-title">{html.escape(str(b["title"]))}</div>',
+          f'<div class="book-meta">👶 {html.escape(str(b.get("age", "-")))}'
+          f'<br>📄 {pages} Sayfa<br>🔄 {rc} Kez Okundu</div></div>',
+      ]),
+      unsafe_allow_html=True,
+  )
+  if st.button("📖 Hemen Oku", key=f"{prefix}_{b['id']}", use_container_width=True):
+    show_book_detail(b["id"])
+
+
 # --- SAYFA YÖNETİMİ ---
 active_page = st.session_state.nav_page
 
 # 1. ANA SAYFA
 if active_page == "Ana Sayfa":
-  col_h1, col_h2 = st.columns([2.2, 1])
-  with col_h1:
+  pool_df = get_pool_df()
+  active_cat_label = st.session_state.home_active_category
+
+  with st.container(key="hero_box"):
     st.markdown(
-        """
-            <div class="hero-container">
-                <h1>Merhaba Atlas! 👋</h1>
-                <p>Bugün hangi harika maceraya yelken açmak istersin? ✨ Her kitap seni yeni bir dünyaya götürür.</p>
-            </div>
-        """,
+        "".join([
+            '<div class="hero-title">👋 Merhaba Atlas</div>',
+            '<div class="hero-sub">Bugün seni yeni maceralar bekliyor. Her kitap yeni bir dünyadır. ✨</div>',
+            f'<div class="hero-xp"><b>⭐ Seviye {lvl["level"]}</b>{level_bar_html(lvl)}</div>',
+        ]),
         unsafe_allow_html=True,
     )
-  with col_h2:
-    now_check = datetime.now(TZ)
-    if now_check.hour >= 19:
-      pool_df = books_df[books_df["category"] != "Aktivite"]
-    else:
-      pool_df = books_df
+    hb1, hb2, _sp = st.columns([1, 1, 2])
+    hb1.button("🎡 Sihirli Çark", key="hero_wheel", on_click=spin_wheel, use_container_width=True)
+    hb2.button("📚 Rastgele Öner", key="hero_random", on_click=random_pick, use_container_width=True)
 
-    # SİHİRLİ ÇARK: 2 KİTAP ÖNERİR (Hizalama boşlukları düzenlendi)
-    st.markdown(
-        "<div style='height: 2px;'></div>", unsafe_allow_html=True
-    )
-    if st.button("🎡 Sihirli Çarkı Çevir", use_container_width=True):
-      if len(pool_df) > 0:
-        unread_pool = pool_df[pool_df["read_count"] == 0]
-        target_pool = unread_pool if len(unread_pool) > 0 else pool_df
-        sample_n = min(2, len(target_pool))
-        st.session_state.current_featured_books = (
-            target_pool.sample(n=sample_n).to_dict(orient="records")
-        )
-      st.rerun()
-
-    st.markdown(
-        "<div style='height: 4px;'></div>", unsafe_allow_html=True
-    )
-    # RASTGELE ÖNER: 4 KİTAP ÖNERİR
-    if st.button("📚 Rastgele Kitap Öner", use_container_width=True):
-      if len(pool_df) > 0:
-        st.session_state.current_featured_books = (
-            pool_df.sample(n=min(4, len(pool_df)))
-            .to_dict(orient="records")
-        )
-      st.rerun()
-
-  # 19:00 Sonrası Uyarı Notu
-  st.info(
-      "🌙 Saat 19:00’dan sonra uyku öncesi huzur için **Aktivite** haricindeki"
-      " tüm kitaplar seçiliyor."
-  )
+  st.caption("🌙 Saat 19:00’dan sonra uyku öncesi huzur için Aktivite haricindeki tüm kitaplar seçilir.")
 
   st.markdown("#### ✨ Keşfetmek İstediğin Dünyayı Seç")
-
-  cat_cols = st.columns(7)
   categories = [
-      ("🌟", "Tümü"),
-      ("🐉", "Hikaye"),
-      ("🚀", "Bilgi"),
-      ("🦁", "Aktivite"),
-      ("💡", "İlk Okuma"),
-      ("🌍", "Doğa"),
-      ("🔬", "Bilim"),
+      ("🌟", "Tümü", "Tümü"), ("🐉", "Hikaye", "Hikaye"),
+      ("🚀", "Bilgi", "Bilgi & Keşif"), ("🦁", "Aktivite", "Aktivite"),
+      ("💡", "İlk Okuma", "İlk Okuma"), ("🌍", "Doğa", "Doğa & Hayvanlar"),
+      ("🔬", "Bilim", "Bilim"),
   ]
+  cat_counts = books_df["category"].value_counts().to_dict()
+  cat_cols = st.columns(len(categories))
+  for idx, (icon, label, actual) in enumerate(categories):
+    n = len(books_df) if actual == "Tümü" else cat_counts.get(actual, 0)
+    is_on = active_cat_label == actual
+    cat_cols[idx].button(
+        f"{icon} **{label}**\n\n{n} kitap",
+        key=f"{'catON' if is_on else 'cat'}_{idx}",
+        on_click=pick_category,
+        args=(actual,),
+        use_container_width=True,
+    )
 
-  for idx, (icon, cat_key) in enumerate(categories):
-    with cat_cols[idx]:
-      actual_cat = (
-          "Bilgi & Keşif"
-          if cat_key == "Bilgi"
-          else ("Doğa & Hayvanlar" if cat_key == "Doğa" else cat_key)
-      )
-      if st.button(
-          f"{icon} {cat_key}",
-          key=f"home_cat_{cat_key}",
-          use_container_width=True,
-      ):
-        st.session_state.home_active_category = actual_cat
-        if actual_cat == "Tümü":
-          sub_pool = pool_df
-        else:
-          sub_pool = pool_df[pool_df["category"] == actual_cat]
-
-        if len(sub_pool) > 0:
-          st.session_state.current_featured_books = (
-              sub_pool.sample(n=min(4, len(sub_pool)))
-              .to_dict(orient="records")
-          )
-        else:
-          st.session_state.current_featured_books = []
-        st.rerun()
-
-  active_cat_label = st.session_state.home_active_category
   st.markdown("<br>", unsafe_allow_html=True)
   st.markdown(
-      f"#### ⭐ Senin İçin Seçtiklerimiz ({active_cat_label})"
+      "#### ⭐ Senin İçin Seçtiklerimiz"
+      + (f" ({active_cat_label})" if active_cat_label != "Tümü" else "")
   )
 
   featured_books = st.session_state.current_featured_books
@@ -562,56 +571,32 @@ if active_page == "Ana Sayfa":
     st.session_state.current_featured_books = featured_books
 
   if featured_books:
-    home_cols = st.columns(len(featured_books))
-    current_books_df = get_books_df()
-
-    for idx, book in enumerate(featured_books):
+    home_cols = st.columns(4)
+    for idx, book in enumerate(featured_books[:4]):
       with home_cols[idx]:
-        b_live = current_books_df[current_books_df["id"] == book["id"]]
-        read_cnt = (
-            int(b_live.iloc[0]["read_count"])
-            if len(b_live) > 0
-            else book.get("read_count", 0)
-        )
+        live = books_df[books_df["id"] == book["id"]]
+        book_card(live.iloc[0] if len(live) else book, "home", 170)
 
-        with st.container(border=True):
-          c_img = cover(book.get("cover_url"))
-          if c_img:
-            st.markdown(
-                f'<div style="height: 140px; display: flex; align-items:'
-                f' center; justify-content: center;"><img src="{c_img}"'
-                ' style="max-height: 140px; object-fit: contain; border-radius:'
-                ' 10px;"></div>',
-                unsafe_allow_html=True,
-            )
-          else:
-            st.markdown(
-                '<div style="height: 140px; display: flex; align-items: center;'
-                ' justify-content: center; font-size: 4rem;">📘</div>',
-                unsafe_allow_html=True,
-            )
-
-          st.markdown(
-              f"<div style='font-size: 1.05rem; font-weight: 800; margin: 8px"
-              f" 0; text-align: center; height: 45px; display: flex;"
-              f" align-items: center; justify-content: center;'>📖"
-              f" {book['title']}</div>",
-              unsafe_allow_html=True,
-          )
-          st.markdown(
-              f"<div style='font-size: 0.85rem; color: #64748b; text-align:"
-              f" center; margin-bottom: 10px;'>🎯 Yaş: {book.get('age', '5+')} |"
-              f" 🔄 Okunma: {read_cnt}</div>",
-              unsafe_allow_html=True,
-          )
-
-          # Butonu ortalayan kapsayıcı
-          st.markdown(
-              '<div class="centered-button-container">', unsafe_allow_html=True
-          )
-          if st.button("🔍 Detay & Oku", key=f"home_det_{book['id']}"):
-            show_book_detail(book["id"])
-          st.markdown("</div>", unsafe_allow_html=True)
+  st.markdown("#### 📖 Son Maceraların")
+  title_map = dict(zip(books_df["id"], books_df["title"]))
+  recent, seen = [], set()
+  for l in sorted(logs_data, key=lambda x: x.get("read_at") or "", reverse=True):
+    bid = l.get("book_id")
+    if bid in title_map and bid not in seen:
+      seen.add(bid)
+      recent.append((title_map[bid], (l.get("read_at") or "")[:10]))
+    if len(recent) == 5:
+      break
+  if recent:
+    st.markdown(
+        "".join(
+            f'<div class="recent-item"><div>📖 <b>{html.escape(str(t))}</b></div><span>{d}</span></div>'
+            for t, d in recent
+        ),
+        unsafe_allow_html=True,
+    )
+  else:
+    st.info("Henüz okunan kitap yok. İlk maceranı başlat! 🚀")
 
 
 # 2. KÜTÜPHANE
@@ -677,37 +662,39 @@ elif active_page == "Kütüphane":
 
   for start in range(0, len(filtered_lib), 4):
     cols = st.columns(4)
-    chunk = filtered_lib.iloc[start : start + 4]
-    for c_idx, (_, b) in enumerate(chunk.iterrows()):
+    for c_idx, (_, b) in enumerate(filtered_lib.iloc[start : start + 4].iterrows()):
       with cols[c_idx]:
-        c_img = cover(b.get("cover_url"))
-        img_html = (
-            f'<img src="{c_img}" style="height: 130px; object-fit: contain;'
-            ' border-radius: 8px; margin-bottom: 8px; display: block;'
-            ' margin-left: auto; margin-right: auto;">'
-            if c_img
-            else '<div style="font-size: 3.5rem; margin-bottom: 8px; text-align: center;">📘</div>'
-        )
-
-        st.markdown(
-            f"""
-            <div style="background: white; border-radius: 20px; padding: 15px; border: 1px solid #e2e8f0; height: 240px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; align-items: center;">
-                <div>
-                    {img_html}
-                    <h4 style="font-size: 1rem; color: #1e293b; margin: 5px 0; font-weight: 700; line-height: 1.2;">{b['title']}</h4>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if st.button("🔍 Detaylar", key=f"det_{b['id']}", use_container_width=True):
-          show_book_detail(b["id"])
+        book_card(b, "lib", 210)
 
 
 # 3. OKUMA YOLCULUĞU
 elif active_page == "Okuma Yolculuğu":
   st.markdown("### 🏆 Okuma Karnesi ve Detaylı İstatistikler")
+
+  milestones = [
+      ("🏠 Ev", 0), ("✈️ Havalimanı", 5), ("🚂 Tren İstasyonu", 10),
+      ("🏰 Şato", 20), ("🌳 Doğa", 35), ("🚀 Uzay", 50), ("🪐 Galaksi", 75),
+  ]
+  cur_idx = max(i for i, (_, req) in enumerate(milestones) if total_read_books >= req)
+  stops = []
+  for i, (label, req) in enumerate(milestones):
+    state = "done" if i < cur_idx else ("now" if i == cur_idx else "lock")
+    icon, name = label.split(" ", 1)
+    sub = {"done": "✅ Tamamlandı", "now": "📍 Buradasın", "lock": f"🔒 {req} kitap"}[state]
+    stops.append(
+        f'<div class="stop {state}"><div class="stop-icon">{icon}</div>{name}<small>{sub}</small></div>'
+    )
+  st.markdown(f'<div class="journey">{"".join(stops)}</div>', unsafe_allow_html=True)
+  if cur_idx < len(milestones) - 1:
+    nxt_label, nxt_req = milestones[cur_idx + 1]
+    prev_req = milestones[cur_idx][1]
+    st.progress(
+        min((total_read_books - prev_req) / (nxt_req - prev_req), 1.0),
+        text=f"{nxt_label} durağına {nxt_req - total_read_books} kitap kaldı",
+    )
+  else:
+    st.success("🪐 Tüm durakları tamamladın!")
+  st.markdown("---")
 
   total_books_count = len(books_df)
   read_books_df = books_df[books_df["read_count"] > 0]
@@ -787,6 +774,11 @@ elif active_page == "Rozetler":
 
   tot_read = len(books_df[books_df["read_count"] > 0])
 
+  c1, c2, c3 = st.columns(3)
+  c1.markdown(f'<div class="stat-card"><small>LEVEL</small><div class="stat-val">⭐ {lvl["level"]}</div></div>', unsafe_allow_html=True)
+  c2.markdown(f'<div class="stat-card"><small>XP</small><div class="stat-val">{lvl["xp"]}</div></div>', unsafe_allow_html=True)
+  c3.markdown(f'<div class="stat-card"><small>İLERLEME</small>{level_bar_html(lvl)}</div>', unsafe_allow_html=True)
+
   r_cols = st.columns(3)
   badges = [
       ("🥉", "İlk Adım", "İlk kitabını okudun!", 1),
@@ -819,7 +811,12 @@ elif active_page == "Rozetler":
 
 # 5. YÖNETİCİ PANELİ
 elif active_page == "Yönetici Paneli":
-  st.markdown("### ⚙️ Yönetici Kontrol Paneli")
+  st.markdown(ADMIN_CSS, unsafe_allow_html=True)
+  st.markdown(
+      '<div class="admin-head"><h2>Yönetim Paneli</h2>'
+      '<p>Katalog, kapak ve okuma kayıtları yönetimi</p></div>',
+      unsafe_allow_html=True,
+  )
 
   if not st.session_state.admin_logged_in:
     try:
@@ -845,6 +842,13 @@ elif active_page == "Yönetici Paneli":
     if st.button("Çıkış Yap"):
       st.session_state.admin_logged_in = False
       st.rerun()
+
+    missing_n = int((books_df["cover_url"].isna() | (books_df["cover_url"] == "")).sum())
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Toplam Kitap", total_books)
+    k2.metric("Okuma Kaydı", len(logs_data))
+    k3.metric("Bu Ay", month_read_count)
+    k4.metric("Kapağı Eksik", missing_n)
 
     st.markdown("---")
 
