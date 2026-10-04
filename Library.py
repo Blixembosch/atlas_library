@@ -17,10 +17,22 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ ---
+# --- CSS STİLLERİ (Üst Boşlukları Sıfırlama ve Tam Görünürlük Optimizasyonu) ---
 st.markdown(
     """
 <style>
+    /* Streamlit varsayılan üst boşluklarını ve header alanını tamamen sıfırla */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 0px !important;
+    }
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
     .stApp {
         background-color: #f8fafc !important;
         color: #1e293b;
@@ -36,25 +48,26 @@ st.markdown(
         padding-bottom: 0px !important;
     }
     
+    /* iPad ekranına tam sığması için optimize edilmiş mor banner */
     .hero-container {
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
-        border-radius: 20px;
-        padding: 20px 25px;
+        border-radius: 14px;
+        padding: 10px 16px;
         color: white;
-        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
-        margin-bottom: 15px;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        margin-bottom: 6px;
         height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
     .hero-container h1 {
-        font-size: 2rem;
+        font-size: 1.45rem;
         font-weight: 900;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .hero-container p {
-        font-size: 1rem;
+        font-size: 0.85rem;
         opacity: 0.95;
         font-weight: 500;
         margin-bottom: 0px;
@@ -63,18 +76,18 @@ st.markdown(
     .sidebar-card {
         background: #ffffff;
         border-radius: 10px;
-        padding: 6px 8px;
+        padding: 5px 8px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         text-align: center;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
     }
 
     div.stButton > button {
         border-radius: 10px;
         font-size: 0.78rem !important;
         font-weight: 700;
-        padding: 6px 4px !important;
+        padding: 5px 4px !important;
         width: 100%;
         color: #ffffff !important;
         background-color: #6366f1;
@@ -88,6 +101,17 @@ st.markdown(
     div.stButton > button:hover {
         transform: translateY(-2px);
         background-color: #4f46e5;
+    }
+
+    /* Kart içindeki butonları kesin olarak ortalamak için kapsayıcı */
+    .centered-button-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+    .centered-button-container > div {
+        width: 90% !important;
     }
 </style>
 """,
@@ -244,14 +268,14 @@ with st.sidebar:
   st.markdown(
       """
         <div style="text-align: center; margin-bottom: 0px;">
-            <div style="font-size: 2.5rem; line-height: 1.1;">🏰</div>
-            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 0.95rem;">Atlas'ın Sihirli Kütüphanesi</h3>
-            <p style="color: #64748b; font-size: 0.7rem; margin: 0px 0;">Keşfet • Oku • Hayal Et</p>
+            <div style="font-size: 2rem; line-height: 1.1;">🏰</div>
+            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 0.85rem;">Atlas'ın Sihirli Kütüphanesi</h3>
+            <p style="color: #64748b; font-size: 0.6rem; margin: 0px 0;">Keşfet • Oku • Hayal Et</p>
         </div>
     """,
       unsafe_allow_html=True,
   )
-  st.markdown("<hr style='margin: 3px 0;'>", unsafe_allow_html=True)
+  st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
 
   menu_items = [
       ("🏠", "Ana Sayfa"),
@@ -270,10 +294,10 @@ with st.sidebar:
       st.session_state.nav_page = label
       st.rerun()
 
-  st.markdown("<hr style='margin: 3px 0;'>", unsafe_allow_html=True)
+  st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
   st.markdown(
-      "<h5 style='color: #1e293b; font-size: 0.8rem; text-align:"
-      " center; margin: 1px 0;'>🏆 Okuma Künyesi</h5>",
+      "<h5 style='color: #1e293b; font-size: 0.7rem; text-align: center;"
+      " margin: 1px 0;'>🏆 Okuma Künyesi</h5>",
       unsafe_allow_html=True,
   )
 
@@ -318,19 +342,19 @@ with st.sidebar:
   st.markdown(
       f"""
         <div class="sidebar-card">
-            <span style="font-size: 0.7rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
-            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
+            <span style="font-size: 0.6rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
+            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
         </div>
         <div class="sidebar-card">
-            <span style="font-size: 0.7rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
-            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
+            <span style="font-size: 0.6rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
+            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
         </div>
         <div class="sidebar-card">
-            <span style="font-size: 0.7rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
-            <p style="font-size: 1rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
+            <span style="font-size: 0.6rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
+            <p style="font-size: 0.9rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
         </div>
         <div style="text-align: center; margin-top: 1px;">
-            <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v5.7</span>
+            <span style="font-size: 0.55rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v5.9</span>
         </div>
     """,
       unsafe_allow_html=True,
@@ -433,10 +457,6 @@ if active_page == "Ana Sayfa":
         unsafe_allow_html=True,
     )
   with col_h2:
-    st.markdown(
-        "<div style='height: 5px;'></div>", unsafe_allow_html=True
-    )
-
     now_check = datetime.now(TZ)
     if now_check.hour >= 19:
       pool_df = books_df[books_df["category"] != "Aktivite"]
@@ -455,7 +475,7 @@ if active_page == "Ana Sayfa":
       st.rerun()
 
     st.markdown(
-        "<div style='height: 6px;'></div>", unsafe_allow_html=True
+        "<div style='height: 3px;'></div>", unsafe_allow_html=True
     )
     # RASTGELE ÖNER: 4 KİTAP ÖNERİR
     if st.button("📚 Rastgele Kitap Öner", use_container_width=True):
@@ -582,10 +602,9 @@ if active_page == "Ana Sayfa":
               unsafe_allow_html=True,
           )
 
-          # Butonu ortalamak için sarmalayıcı ekledik
+          # Butonu kesin olarak ortalayan CSS sınıflı sarmalayıcı
           st.markdown(
-              '<div style="display: flex; justify-content: center;">',
-              unsafe_allow_html=True,
+              '<div class="centered-button-container">', unsafe_allow_html=True
           )
           if st.button("🔍 Detay & Oku", key=f"home_det_{book['id']}"):
             show_book_detail(book["id"])
