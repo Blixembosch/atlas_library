@@ -18,7 +18,7 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (v0.6.5 - Ana Sayfada Aktivite Butonu Gizlendi) ---
+# --- CSS STİLLERİ (v0.6.6 - Parantezli Sayı Düzeni) ---
 st.markdown(
     """
 <style>
@@ -389,7 +389,7 @@ with st.sidebar:
           f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
           f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
           f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
-          '<div class="side-ver">Atlas v0.6.5</div>',
+          '<div class="side-ver">Atlas v0.6.6</div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -525,7 +525,6 @@ if active_page == "Ana Sayfa":
   st.caption("🌙 Saat 19:00’dan sonra uyku öncesi huzur için Aktivite haricindeki tüm kitaplar seçilir.")
 
   st.markdown("#### ✨ Keşfetmek İstediğin Dünyayı Seç")
-  # Aktivite kategorisi ana sayfa buton listesinden çıkarıldı, ancak DB ve diğer sayfalarda aktif.
   categories = [
       ("🌟", "Tümü", "Tümü"), ("🐉", "Hikaye", "Hikaye"),
       ("🚀", "Bilgi", "Bilgi & Keşif"),
@@ -537,8 +536,9 @@ if active_page == "Ana Sayfa":
   for idx, (icon, label, actual) in enumerate(categories):
     n = len(books_df) if actual == "Tümü" else cat_counts.get(actual, 0)
     is_on = active_cat_label == actual
+    # "kitap" yazısı kaldırıldı, sayı parantez içine alındı
     cat_cols[idx].button(
-        f"{icon} **{label}**\n\n{n} kitap",
+        f"{icon} **{label}**\n\n({n})",
         key=f"{'catON' if is_on else 'cat'}_{idx}",
         on_click=pick_category,
         args=(actual,),
@@ -673,7 +673,7 @@ elif active_page == "Okuma Yolculuğu":
   st.markdown("### 🏆 Okuma Karnesi ve Detaylı İstatistikler")
 
   milestones = [
-      ("🏠 Ev", 0), ("✈️ Havalimanı", 5), ("🚂 Tren İstasyonu", 10),
+      ("🏠 Ev", 0), ("✈️️ Havalimanı", 5), ("🚂 Tren İstasyonu", 10),
       ("🏰 Şato", 20), ("🌳 Doğa", 35), ("🚀 Uzay", 50), ("🪐 Galaksi", 75),
   ]
   cur_idx = max(i for i, (_, req) in enumerate(milestones) if total_read_books >= req)
@@ -1002,7 +1002,7 @@ elif active_page == "Yönetici Paneli":
             st.rerun()
 
     with adm_missing_covers:
-      st.subheader("🖼️ Görseli Eksik Olan Kitaplar ve Hızlı Kapak Ekleme")
+      st.subheader("🖼️️ Görseli Eksik Olan Kitaplar ve Hızlı Kapak Ekleme")
       missing_df = books_df[
           books_df["cover_url"].isna() | (books_df["cover_url"] == "")
       ]
