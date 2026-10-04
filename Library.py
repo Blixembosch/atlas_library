@@ -17,7 +17,7 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ ---
+# --- CSS STİLLERİ (Sidebar Dikey Sığdırma Optimizasyonu) ---
 st.markdown(
     """
 <style>
@@ -26,65 +26,59 @@ st.markdown(
         color: #1e293b;
     }
     section[data-testid="stSidebar"] {
-        background-color: #f1f5f9 !important;
+        background-color: #f8fafc !important;
         border-right: 1px solid #e2e8f0;
+        padding-top: 5px !important;
+        padding-bottom: 5px !important;
     }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        display: flex;
-        justify-content: center !important;
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 5px !important;
+        padding-bottom: 5px !important;
     }
     
     .hero-container {
-        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%);
         border-radius: 28px;
         padding: 35px;
         color: white;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.25);
         margin-bottom: 25px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     .hero-container h1 {
-        font-size: 2.8rem;
+        font-size: 2.5rem;
         font-weight: 900;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
     .hero-container p {
-        font-size: 1.2rem;
-        opacity: 0.9;
+        font-size: 1.15rem;
+        opacity: 0.95;
         font-weight: 500;
     }
     
-    .cat-box {
-        background: #ffffff;
-        border-radius: 20px;
-        padding: 20px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        text-align: center;
-        margin-bottom: 15px;
-    }
-
     .sidebar-card {
         background: #ffffff;
-        border-radius: 18px;
-        padding: 15px;
+        border-radius: 12px;
+        padding: 8px 10px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
         text-align: center;
-        margin-bottom: 12px;
+        margin-bottom: 6px;
     }
 
     div.stButton > button {
-        border-radius: 14px;
-        font-size: 1rem;
+        border-radius: 12px;
+        font-size: 0.88rem;
         font-weight: 700;
-        padding: 12px 20px;
+        padding: 8px 12px;
         width: 100%;
         color: #ffffff !important;
         background-color: #6366f1;
         border: none;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        box-shadow: 0 3px 10px rgba(99, 102, 241, 0.2);
         transition: all 0.2s ease;
     }
     div.stButton > button:hover {
@@ -95,6 +89,37 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+
+def akilli_kategori_belirle(title, author, subcategory=""):
+  t = str(title).lower()
+  sub = str(subcategory).lower()
+  combined = f"{t} {sub}"
+
+  bilim_kelimeler = [
+      "bilim",
+      "matematik",
+      "problem",
+      "kg",
+      "kilogram",
+      "ölç",
+      "sayı",
+      "uzay",
+      "deney",
+      "fizik",
+      "kimya",
+      "gezegeni",
+      "robot",
+      "kodlama",
+      "mucit",
+      "icat",
+      "dünya",
+      "evren",
+      "yıldız",
+  ]
+  if any(k in combined for k in bilim_kelimeler):
+    return "Bilim"
+  return None
 
 
 def db():
@@ -109,16 +134,36 @@ def db():
       " AUTOINCREMENT,book_id TEXT,status TEXT,read_at TEXT,cycle INTEGER"
       " DEFAULT 1);"
   )
+
+  cursor = con.cursor()
+  cursor.execute("PRAGMA table_info(books)")
+  columns = [col["name"] for col in cursor.fetchall()]
+  if "language" not in columns:
+    cursor.execute("ALTER TABLE books ADD COLUMN language TEXT DEFAULT 'Türkçe'")
+    con.commit()
+
   if con.execute("select count() from books").fetchone()[0] == 0:
     SEED.parent.mkdir(parents=True, exist_ok=True)
     if SEED.exists():
       df = pd.read_csv(SEED, dtype=str).fillna("")
       df["created_at"] = datetime.now(TZ).isoformat()
       df["read_count"] = 0
+      if "language" not in df.columns:
+        df["language"] = "Türkçe"
       if "cover_url" in df.columns:
         df["cover_url"] = df["cover_url"].apply(
             lambda x: "" if "longitood.com" in str(x) else x
         )
+
+      def apply_smart_cat(row):
+        smart = akilli_kategori_belirle(
+            row.get("title", ""),
+            row.get("author", ""),
+            row.get("subcategory", ""),
+        )
+        return smart if smart else row.get("category", "Hikaye")
+
+      df["category"] = df.apply(apply_smart_cat, axis=1)
       df.to_sql("books", con, if_exists="append", index=False)
       con.commit()
   else:
@@ -127,6 +172,20 @@ def db():
         " '%longitood.com%'"
     )
     con.commit()
+
+  all_b = con.execute(
+      "SELECT id, title, author, subcategory, category FROM books"
+  ).fetchall()
+  for b in all_b:
+    smart = akilli_kategori_belirle(
+        b["title"], b["author"], b["subcategory"]
+    )
+    if smart == "Bilim":
+      con.execute(
+          "UPDATE books SET category = 'Bilim' WHERE id = ?", (b["id"],)
+      )
+  con.commit()
+
   return con
 
 
@@ -148,7 +207,6 @@ def cover(url):
   return str(url).strip()
 
 
-@st.cache_data
 def get_books_df():
   con = sqlite3.connect(DB_NAME)
   df = pd.read_sql("SELECT * FROM books", con)
@@ -157,6 +215,8 @@ def get_books_df():
     df["read_count"] = 0
   else:
     df["read_count"] = pd.to_numeric(df["read_count"], errors="coerce").fillna(0)
+  if "language" not in df.columns:
+    df["language"] = "Türkçe"
   return df
 
 
@@ -168,17 +228,46 @@ if "current_featured_books" not in st.session_state:
   st.session_state.current_featured_books = []
 if "admin_logged_in" not in st.session_state:
   st.session_state.admin_logged_in = False
-if "selected_pub_filter" not in st.session_state:
-  st.session_state.selected_pub_filter = "Tümü"
+if "nav_page" not in st.session_state:
+  st.session_state.nav_page = "Ana Sayfa"
 
-# --- SOL KENAR ÇUBUĞU (KÜNYE) ---
+# --- SOL KENAR ÇUBUĞU (TEK SAYFAYA SIĞACAK ŞEKİLDE OPTİMİZE EDİLDİ) ---
 with st.sidebar:
   st.markdown(
-      "<h3 style='color: #1e293b; margin-bottom: 0px; text-align:"
-      " center;'>🏆 Okuma Künyesi</h3>",
+      """
+        <div style="text-align: center; margin-bottom: 2px;">
+            <div style="font-size: 3.2rem;">🏰</div>
+            <h3 style="color: #1e293b; margin: 0; font-weight: 800; font-size: 1rem;">Atlas'ın Sihirli Kütüphanesi</h3>
+            <p style="color: #64748b; font-size: 0.75rem; margin: 1px 0;">Keşfet • Oku • Hayal Et</p>
+        </div>
+    """,
       unsafe_allow_html=True,
   )
-  st.markdown("---")
+  st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+
+  menu_items = [
+      ("🏠", "Ana Sayfa"),
+      ("📖", "Kütüphane"),
+      ("🏆", "Okuma Yolculuğu"),
+      ("🎖️", "Rozetler"),
+      ("⚙️", "Yönetici Paneli"),
+  ]
+
+  for icon, label in menu_items:
+    if st.button(
+        f"{icon}  {label}",
+        key=f"nav_btn_{label}",
+        use_container_width=True,
+    ):
+      st.session_state.nav_page = label
+      st.rerun()
+
+  st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+  st.markdown(
+      "<h5 style='color: #1e293b; font-size: 0.85rem; text-align:"
+      " center; margin: 2px 0;'>🏆 Okuma Künyesi</h5>",
+      unsafe_allow_html=True,
+  )
 
   total_books = len(books_df)
   logs_data = rows("reading_log")
@@ -221,46 +310,23 @@ with st.sidebar:
   st.markdown(
       f"""
         <div class="sidebar-card">
-            <h4 style="color: #4f46e5; margin-bottom: 4px; font-weight: 800; font-size: 1rem;">📚 Toplam Kitap</h4>
-            <p style="font-size: 1.6rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
+            <span style="font-size: 0.75rem; color: #64748b; font-weight: 700;">📚 Toplam Kitap</span>
+            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{total_books}</p>
         </div>
-    """,
-      unsafe_allow_html=True,
-  )
-
-  st.markdown(
-      f"""
         <div class="sidebar-card">
-            <h4 style="color: #059669; margin-bottom: 4px; font-weight: 800; font-size: 1rem;">📅 Bu Ay ({current_month_name})</h4>
-            <p style="font-size: 1.6rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
+            <span style="font-size: 0.75rem; color: #059669; font-weight: 700;">📅 Bu Ay ({current_month_name})</span>
+            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{month_read_count}</p>
         </div>
-    """,
-      unsafe_allow_html=True,
-  )
-
-  st.markdown(
-      f"""
         <div class="sidebar-card">
-            <h4 style="color: #d97706; margin-bottom: 4px; font-weight: 800; font-size: 1rem;">🌟 Bu Yıl ({current_year})</h4>
-            <p style="font-size: 1.6rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
+            <span style="font-size: 0.75rem; color: #d97706; font-weight: 700;">🌟 Bu Yıl ({current_year})</span>
+            <p style="font-size: 1.1rem; color: #1e293b; font-weight: 900; margin: 0;">{year_read_count}</p>
+        </div>
+        <div style="text-align: center; margin-top: 2px;">
+            <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">🏰 Atlas'ın Sihirli Kütüphanesi v4.7</span>
         </div>
     """,
       unsafe_allow_html=True,
   )
-
-  st.markdown("---")
-  st.caption("🏰 Atlas'ın Sihirli Kütüphanesi v2.8")
-
-# --- ÜST HERO ALANI ---
-st.markdown(
-    """
-    <div class="hero-container">
-        <h1>🏰 Atlas'ın Sihirli Kütüphanesi 📚</h1>
-        <p>Bugün hangi harika maceraya yelken açmak istersin?</p>
-    </div>
-""",
-    unsafe_allow_html=True,
-)
 
 
 # --- DETAY MODALI VE GEÇMİŞ OKUMA EKLEME ---
@@ -305,6 +371,7 @@ def show_book_detail(b_id):
         f"📂 **Kategori:** {b.get('category', '-')} &nbsp;|&nbsp; 🎯 **Yaş:**"
         f" {b.get('age', '-')}"
     )
+    st.markdown(f"🌍 **Kitap Dili:** {b.get('language', 'Türkçe')}")
     st.markdown(f"🔄 **Toplam Okunma Sayısı:** {int(b.get('read_count', 0))}")
     st.markdown(f"⏱️ **En Son Okunma Tarihi:** {last_read_time}")
 
@@ -335,202 +402,165 @@ def show_book_detail(b_id):
       st.success(
           f"'{b['title']}' başarıyla {selected_date} tarihiyle kaydedildi! 🎉"
       )
-      st.cache_data.clear()
       st.rerun()
 
   if st.button("Kapat", use_container_width=True):
     st.rerun()
 
 
-# --- ANA SEKMELER ---
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🎡 Sihirli Çark",
-    "📖 Kütüphane & Arama",
-    "🏆 Okuma Yolculuğu",
-    "⚙️ Yönetici Paneli",
-])
+# --- SAYFA YÖNETİMİ ---
+active_page = st.session_state.nav_page
 
-# 1. SEKME: SİHİRLİ ÇARK
-with tab1:
-  now = datetime.now(TZ)
-  if now.hour >= 19:
-    st.info(
-        "🌙 Saat 19:00’dan sonra uyku öncesi huzur için yalnızca **Hikaye**"
-        " kitapları seçiliyor."
+# 1. ANA SAYFA
+if active_page == "Ana Sayfa":
+  col_h1, col_h2 = st.columns([2.2, 1])
+  with col_h1:
+    st.markdown(
+        """
+            <div class="hero-container">
+                <h1>Merhaba Atlas! 👋</h1>
+                <p>Bugün hangi harika maceraya yelken açmak istersin? Her kitap seni yeni bir maceraya götürür. ✨</p>
+            </div>
+        """,
+        unsafe_allow_html=True,
     )
-  else:
-    st.info(
-        "☀️ Gündüz kuşağı aktif: Bilgi, aktivite, ilk okuma ve hikaye kitapları"
-        " keşif için hazır!"
+  with col_h2:
+    st.markdown(
+        "<div style='height: 15px;'></div>", unsafe_allow_html=True
     )
 
-  st.markdown(
-      "<h4 style='text-align: center; color: #475569; margin-bottom: 15px;'>✨"
-      " Keşfetmek İstediğin Dünyayı Seç</h4>",
-      unsafe_allow_html=True,
-  )
+    now_check = datetime.now(TZ)
+    if now_check.hour >= 19:
+      pool_df = books_df[books_df["category"] != "Aktivite"]
+    else:
+      pool_df = books_df
 
-  cat_cols = st.columns([1, 1, 1, 1, 1])
-  categories = [
-      ("🌟 Tümü", "Tümü"),
-      ("🐉 Hikaye", "Hikaye"),
-      ("🚀 Bilgi & Keşif", "Bilgi & Keşif"),
-      ("🦁 Aktivite", "Aktivite"),
-      ("💡 İlk Okuma", "İlk Okuma"),
-  ]
-
-  for idx, (label, cat_key) in enumerate(categories):
-    with cat_cols[idx]:
-      if st.button(label, key=f"cat_btn_{cat_key}", use_container_width=True):
-        st.session_state.selected_category = cat_key
-        st.session_state.current_featured_books = []
-        st.rerun()
-
-  st.markdown("<br>", unsafe_allow_html=True)
-
-  col_spin1, col_spin2, col_spin3 = st.columns([1, 2, 1])
-  with col_spin2:
-    if st.button("🎲 SİHİRLİ ÇARKI ÇEVİR!", use_container_width=True):
-      pool_df = (
-          books_df
-          if st.session_state.selected_category == "Tümü"
-          else books_df[
-              books_df["category"] == st.session_state.selected_category
-          ]
-      )
+    if st.button("🎡 Sihirli Çarkı Çevir", use_container_width=True):
       if len(pool_df) > 0:
         unread_pool = pool_df[pool_df["read_count"] == 0]
         target_pool = unread_pool if len(unread_pool) > 0 else pool_df
-        sample_n = min(2, len(target_pool))
+        sample_n = min(4, len(target_pool))
         st.session_state.current_featured_books = (
             target_pool.sample(n=sample_n).to_dict(orient="records")
         )
       st.rerun()
 
-  featured_books = st.session_state.current_featured_books
-  if featured_books:
-    _, col_b1, col_b2, _ = st.columns([0.5, 4, 4, 0.5])
-    book_columns = [col_b1, col_b2]
+    st.markdown(
+        "<div style='height: 10px;'></div>", unsafe_allow_html=True
+    )
+    if st.button("📚 Rastgele Kitap Öner", use_container_width=True):
+      if len(pool_df) > 0:
+        st.session_state.current_featured_books = (
+            pool_df.sample(n=min(4, len(pool_df)))
+            .to_dict(orient="records")
+        )
+      st.rerun()
 
+  now = datetime.now(TZ)
+  if now.hour >= 19:
+    st.info(
+        "🌙 Saat 19:00’dan sonra uyku öncesi huzur için **Aktivite** haricindeki"
+        " tüm kitaplar seçiliyor[cite: 10]."
+    )
+
+  st.markdown("#### ✨ Keşfetmek İstediğin Dünyayı Seç")
+
+  cat_cols = st.columns(7)
+  categories = [
+      ("🌟", "Tümü"),
+      ("🐉", "Hikaye"),
+      ("🚀", "Bilgi & Keşif"),
+      ("🦁", "Aktivite"),
+      ("💡", "İlk Okuma"),
+      ("🌍", "Doğa & Hayvanlar"),
+      ("🔬", "Bilim"),
+  ]
+
+  for idx, (icon, cat_key) in enumerate(categories):
+    with cat_cols[idx]:
+      if st.button(
+          f"{icon}\n{cat_key}",
+          key=f"home_cat_{cat_key}",
+          use_container_width=True,
+      ):
+        st.session_state.selected_category = cat_key
+        st.session_state.nav_page = "Kütüphane"
+        st.rerun()
+
+  st.markdown("<br>", unsafe_allow_html=True)
+  st.markdown("#### ⭐ Senin İçin Seçtiklerimiz")
+
+  featured_books = st.session_state.current_featured_books
+  if not featured_books or len(featured_books) < 4:
+    default_pool = (
+        books_df[books_df["category"] != "Aktivite"]
+        if datetime.now(TZ).hour >= 19
+        else books_df
+    )
+    if len(default_pool) >= 4:
+      featured_books = default_pool.sample(n=4).to_dict(orient="records")
+    elif len(books_df) > 0:
+      featured_books = books_df.sample(
+          n=min(4, len(books_df))
+      ).to_dict(orient="records")
+    st.session_state.current_featured_books = featured_books
+
+  if featured_books:
+    home_cols = st.columns(4)
     current_books_df = get_books_df()
 
-    for idx, book in enumerate(featured_books):
-      with book_columns[idx]:
+    for idx, book in enumerate(featured_books[:4]):
+      with home_cols[idx]:
         b_live = current_books_df[current_books_df["id"] == book["id"]]
         read_cnt = (
             int(b_live.iloc[0]["read_count"])
             if len(b_live) > 0
             else book.get("read_count", 0)
         )
-        is_read_now = read_cnt > 0
 
         with st.container(border=True):
-          cover_img = cover(book.get("cover_url"))
-          if cover_img:
+          c_img = cover(book.get("cover_url"))
+          if c_img:
             st.markdown(
-                f'<div style="height: 180px; display: flex; align-items: center;'
-                f' justify-content: center;"><img src="{cover_img}"'
-                ' style="max-height: 180px; object-fit: contain; border-radius:'
-                ' 12px;"></div>',
+                f'<div style="height: 140px; display: flex; align-items:'
+                f' center; justify-content: center;"><img src="{c_img}"'
+                ' style="max-height: 140px; object-fit: contain; border-radius:'
+                ' 10px;"></div>',
                 unsafe_allow_html=True,
             )
           else:
             st.markdown(
-                '<div style="height: 180px; display: flex; align-items: center;'
-                ' justify-content: center; font-size: 5rem;">📘</div>',
+                '<div style="height: 140px; display: flex; align-items: center;'
+                ' justify-content: center; font-size: 4rem;">📘</div>',
                 unsafe_allow_html=True,
             )
 
-          page_val = book.get("pages")
-          page_display = (
-              str(page_val)
-              if not pd.isna(page_val)
-              and str(page_val).strip() not in ["", "0", "-", "None"]
-              else "-"
-          )
-
-          status_badge = (
-              '<span style="color: #15803d; font-weight: 800;">✅ OKUNDU</span>'
-              if is_read_now
-              else '<span style="color: #6366f1; font-weight: 800;">🎯'
-              " OKUNMAYI BEKLİYOR</span>"
-          )
-
           st.markdown(
-              f"<div style='font-size: 1.3rem; color: #1e293b; font-weight:"
-              f" 800; margin: 10px 0; text-align: center; min-height: 50px;"
-              f" display: flex; align-items: center; justify-content:"
-              f" center;'>📖 {book['title']}</div>",
+              f"<div style='font-size: 1.05rem; font-weight: 800; margin: 8px"
+              f" 0; text-align: center; height: 45px; display: flex;"
+              f" align-items: center; justify-content: center;'>📖"
+              f" {book['title']}</div>",
               unsafe_allow_html=True,
           )
           st.markdown(
-              f"<div style='font-size: 0.92rem; color: #64748b; margin-bottom:"
-              f" 4px; font-weight: 500; text-align: center;'>✍️ <b>Yazar:</b>"
-              f" {book.get('author', 'Bilinmiyor')}</div>",
+              f"<div style='font-size: 0.85rem; color: #64748b; text-align:"
+              f" center;'>✍️ {book.get('author', 'Bilinmiyor')}</div>",
               unsafe_allow_html=True,
           )
           st.markdown(
-              f"<div style='font-size: 0.92rem; color: #64748b; margin-bottom:"
-              f" 4px; font-weight: 500; text-align: center;'>🎯 <b>Yaş:</b>"
-              f" {book.get('age', '5+')} &nbsp;|&nbsp; 📂 <b>Kategori:</b>"
-              f" {book.get('category', 'Hikaye')}</div>",
-              unsafe_allow_html=True,
-          )
-          st.markdown(
-              f"<div style='font-size: 0.92rem; color: #64748b; margin-bottom:"
-              f" 4px; font-weight: 500; text-align: center;'>🏢"
-              f" <b>Yayınevi:</b> {book.get('publisher', 'Bilinmiyor')}</div>",
-              unsafe_allow_html=True,
-          )
-          st.markdown(
-              f"<div style='font-size: 0.92rem; color: #64748b; margin-bottom:"
-              f" 4px; font-weight: 500; text-align: center;'>📄 <b>Sayfa:</b>"
-              f" {page_display} &nbsp;|&nbsp; 🔄 <b>Okunma:</b>"
-              f" {read_cnt}</div>",
-              unsafe_allow_html=True,
-          )
-          st.markdown(
-              f"<div style='margin-top: 8px; text-align:"
-              f" center;'>{status_badge}</div>",
+              f"<div style='font-size: 0.85rem; color: #64748b; text-align:"
+              f" center; margin-bottom: 10px;'>🎯 Yaş: {book.get('age', '5+')} |"
+              f" 🔄 Okunma: {read_cnt}</div>",
               unsafe_allow_html=True,
           )
 
-          st.markdown("<br>", unsafe_allow_html=True)
+          if st.button("🔍 Detay & Oku", key=f"home_det_{book['id']}"):
+            show_book_detail(book["id"])
 
-          if not is_read_now:
-            if st.button(
-                "🎉 OKUDUK!", key=f"read_btn_{book['id']}", use_container_width=True
-            ):
-              con = sqlite3.connect(DB_NAME)
-              con.execute(
-                  "UPDATE books SET read_count = read_count + 1 WHERE id = ?",
-                  (book["id"],),
-              )
-              con.execute(
-                  "INSERT INTO reading_log (book_id, status, read_at, cycle)"
-                  " VALUES (?, 'read', ?, 1)",
-                  (book["id"], datetime.now(TZ).isoformat()),
-              )
-              con.commit()
-              con.close()
 
-              st.balloons()
-              st.success(
-                  f"Harika iş çıkardın Atlas! '{book['title']}' okundu! 🌟"
-              )
-              st.cache_data.clear()
-              st.rerun()
-          else:
-            st.info("Bu kitap okundu olarak işaretlendi! 🌟")
-  else:
-    st.info(
-        "✨ Kitapları keşfetmek için yukarıdan kategori seçip **'SİHİRLİ ÇARKI"
-        " ÇEVİR'** butonuna basın!"
-    )
-
-# 2. SEKME: KÜTÜPHANE VE ARAMA
-with tab2:
-  st.markdown("### 📖 Kütüphane Arşivi ve Arama")
+# 2. KÜTÜPHANE
+elif active_page == "Kütüphane":
+  st.markdown("### 📖 Kütüphane Arşivi")
 
   all_publishers = sorted(
       {
@@ -552,17 +582,22 @@ with tab2:
         "Yayınevi Filtrele", ["Tümü"] + all_publishers, key="lib_pub_select"
     )
   with col_s3:
+    cat_options = [
+        "Tümü",
+        "Hikaye",
+        "Bilgi & Keşif",
+        "Aktivite",
+        "İlk Okuma",
+        "Doğa & Hayvanlar",
+        "Bilim",
+    ]
+    default_cat_idx = (
+        cat_options.index(st.session_state.selected_category)
+        if st.session_state.selected_category in cat_options
+        else 0
+    )
     cat_filter = st.selectbox(
-        "Kategori Filtrele",
-        ["Tümü"]
-        + sorted(
-            {
-                b.get("category", "")
-                for b in books_df.to_dict("records")
-                if b.get("category")
-            }
-        ),
-        key="lib_cat",
+        "Kategori Filtrele", cat_options, index=default_cat_idx, key="lib_cat"
     )
 
   filtered_lib = books_df.copy()
@@ -613,8 +648,9 @@ with tab2:
         if st.button("🔍 Detaylar", key=f"det_{b['id']}", use_container_width=True):
           show_book_detail(b["id"])
 
-# 3. SEKME: OKUMA YOLCULUĞU
-with tab3:
+
+# 3. OKUMA YOLCULUĞU
+elif active_page == "Okuma Yolculuğu":
   st.markdown("### 🏆 Okuma Karnesi ve Detaylı İstatistikler")
 
   total_books_count = len(books_df)
@@ -684,34 +720,49 @@ with tab3:
           unsafe_allow_html=True,
       )
 
-  st.markdown("#### 📚 En Son Okunan Kitaplar")
-  logs_data = rows("reading_log")
-  if logs_data:
-    sorted_all_logs = sorted(
-        logs_data, key=lambda x: x.get("read_at", ""), reverse=True
-    )
-    book_dict = {b["id"]: b for b in books_df.to_dict("records")}
-    recent_list = []
-    seen_ids = set()
-    for l in sorted_all_logs:
-      bid = l.get("book_id")
-      if bid not in seen_ids and bid in book_dict:
-        seen_ids.add(bid)
-        b_info = book_dict[bid]
-        recent_list.append({
-            "Kitap Adı": b_info.get("title"),
-            "Yazar": b_info.get("author"),
-            "Kategori": b_info.get("category"),
-            "Okunma Tarihi": l.get("read_at", "")[:19].replace("T", " "),
-        })
-      if len(recent_list) >= 10:
-        break
-    st.dataframe(pd.DataFrame(recent_list), use_container_width=True)
-  else:
-    st.info("Henüz okuma geçmişi bulunmuyor.")
 
-# 4. SEKME: YÖNETİCİ PANELİ
-with tab4:
+# 4. ROZETLER
+elif active_page == "Rozetler":
+  st.markdown("### 🎖️ Atlas'ın Başarı Rozetleri")
+  st.markdown(
+      "Okuduğun kitap sayısına göre kazandığın sihirli rozetler burada"
+      " listelenir!"
+  )
+
+  tot_read = len(books_df[books_df["read_count"] > 0])
+
+  r_cols = st.columns(3)
+  badges = [
+      ("🥉", "İlk Adım", "İlk kitabını okudun!", 1),
+      ("🥈", "Kitap Kurdu", "5 kitap okumayı başardın!", 5),
+      ("🥇", "Macera Uzmanı", "10 kitap okudun!", 10),
+      ("👑", "Kütüphane Kralı", "25 kitap okudun!", 25),
+      ("🌟", "Sihirli Kaşif", "50 kitaba ulaştın!", 50),
+      ("🏰", "Efsane Okur", "Tüm kütüphaneyi fethettin!", 100),
+  ]
+
+  for idx, (icon, title, desc, req) in enumerate(badges):
+    with r_cols[idx % 3]:
+      unlocked = tot_read >= req
+      bg = "#f0fdf4" if unlocked else "#f8fafc"
+      border_c = "#bbf7d0" if unlocked else "#e2e8f0"
+      status_txt = "✅ KAZANILDI!" if unlocked else f"🔒 {req} Kitap Gerekli"
+
+      st.markdown(
+          f"""
+            <div style="background: {bg}; border: 1px solid {border_c}; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+                <div style="font-size: 3.5rem; margin-bottom: 5px;">{icon}</div>
+                <h4 style="color: #1e293b; margin: 5px 0; font-weight: 800;">{title}</h4>
+                <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 10px;">{desc}</p>
+                <b style="font-size: 0.85rem; color: {'#15803d' if unlocked else '#94a3b8'};">{status_txt}</b>
+            </div>
+        """,
+          unsafe_allow_html=True,
+      )
+
+
+# 5. YÖNETİCİ PANELİ
+elif active_page == "Yönetici Paneli":
   st.markdown("### ⚙️ Yönetici Kontrol Paneli")
 
   if not st.session_state.admin_logged_in:
@@ -752,15 +803,15 @@ with tab4:
         adm_tab7,
         adm_tab8,
     ) = st.tabs([
-        "➕ Yeni Kitap Ekle",
-        "✏️ Kitap Düzenle",
-        "🎨 Kapakları Düzenle",
-        "🖼️ Görseli Olmayanlar",
-        "↩️ Okunmayı Geri Al",
-        "📊 Okuma Özeti",
-        "📝 Ham Log",
-        "🧹 Sıfırlama",
-        "💾 Veritabanı Yedek",
+        "➕ Yeni Kitap",
+        "✏️ Düzenle",
+        "🎨 Kapaklar",
+        "🖼️ Eksik Görseller",
+        "↩️ Geri Al",
+        "📊 Özet",
+        "📝 Loglar",
+        "🧹 Sıfırla",
+        "💾 DB Yedek",
     ])
 
     with adm_tab1:
@@ -772,10 +823,18 @@ with tab4:
         new_isbn = st.text_input("ISBN Numarası")
         new_c = st.selectbox(
             "Kategori",
-            ["Hikaye", "Bilgi & Keşif", "Aktivite", "İlk Okuma", "Duygular & Yaşam"],
+            [
+                "Hikaye",
+                "Bilgi & Keşif",
+                "Aktivite",
+                "İlk Okuma",
+                "Doğa & Hayvanlar",
+                "Bilim",
+            ],
         )
         new_ag = st.text_input("Yaş Grubu", "5+")
         new_pg = st.number_input("Sayfa Sayısı", min_value=1, value=32)
+        new_lang = st.text_input("Kitap Dili", "Türkçe")
         new_cv = st.text_input("Kapak Görsel URL")
 
         if st.form_submit_button("Kütüphaneye Kaydet"):
@@ -784,8 +843,8 @@ with tab4:
             con = sqlite3.connect(DB_NAME)
             con.execute(
                 "INSERT INTO books (id, title, author, publisher, isbn, category, age,"
-                " pages, cover_url, read_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?,"
-                " ?, ?, 0, ?)",
+                " pages, language, cover_url, read_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?,"
+                " ?, ?, ?, 0, ?)",
                 (
                     bid,
                     new_t,
@@ -795,6 +854,7 @@ with tab4:
                     new_c,
                     new_ag,
                     new_pg,
+                    new_lang,
                     new_cv,
                     datetime.now(TZ).isoformat(),
                 ),
@@ -802,41 +862,28 @@ with tab4:
             con.commit()
             con.close()
             st.success(f"'{new_t}' başarıyla eklendi!")
-            st.cache_data.clear()
             st.rerun()
 
     with adm_tab2:
-      st.subheader("✏️ Kitap Künyesini Düzenle (Ad, Yazar, Yayınevi vb.)")
+      st.subheader("✏️ Kitap Künyesini Düzenle")
       edit_search_q = st.text_input(
           "🔍 Düzenlenecek Kitabı Ara",
-          placeholder="Kitap veya yazar adı yazın...",
+          placeholder="Kitap adı yazın...",
           key="edit_book_search",
       )
-
-      if edit_search_q.strip():
-        eq = edit_search_q.strip()
-        matched_edit_books = books_df[
-            books_df["title"]
-            .astype(str)
-            .str.contains(eq, case=False, na=False)
-            | books_df["author"]
-            .astype(str)
-            .str.contains(eq, case=False, na=False)
-        ]
-      else:
-        matched_edit_books = pd.DataFrame()
-        st.info(
-            "💡 Düzenlemek istediğiniz kitabı bulmak için yukarıdaki arama"
-            " çubuğuna adını veya yazarını yazın."
-        )
+      matched_edit_books = (
+          books_df[
+              books_df["title"]
+              .astype(str)
+              .str.contains(edit_search_q.strip(), case=False, na=False)
+          ]
+          if edit_search_q.strip()
+          else pd.DataFrame()
+      )
 
       if len(matched_edit_books) > 0:
-        st.write(
-            f"📚 Eşleşen Kitap Sayısı: **{len(matched_edit_books)}**"
-        )
         for _, eb in matched_edit_books.iterrows():
           with st.form(f"edit_book_form_{eb['id']}"):
-            st.markdown(f"### 📖 {eb['title']}")
             up_title = st.text_input("Kitap Adı", value=eb["title"])
             up_author = st.text_input(
                 "Yazar", value=str(eb.get("author", ""))
@@ -844,126 +891,57 @@ with tab4:
             up_pub = st.text_input(
                 "Yayınevi", value=str(eb.get("publisher", ""))
             )
-
-            cat_list = [
-                "Hikaye",
-                "Bilgi & Keşif",
-                "Aktivite",
-                "İlk Okuma",
-                "Duygular & Yaşam",
-            ]
-            current_cat = eb.get("category", "Hikaye")
-            cat_idx = (
-                cat_list.index(current_cat) if current_cat in cat_list else 0
+            up_lang = st.text_input(
+                "Dil", value=str(eb.get("language", "Türkçe"))
             )
-            up_cat = st.selectbox("Kategori", cat_list, index=cat_idx)
-
-            up_age = st.text_input("Yaş Grubu", value=str(eb.get("age", "5+")))
-            try:
-              p_val = int(eb.get("pages", 32) or 32)
-            except Exception:
-              p_val = 32
-            up_pages = st.number_input(
-                "Sayfa Sayısı", min_value=1, value=p_val
-            )
-
-            if st.form_submit_button(
-                "💾 Değişiklikleri Kaydet", use_container_width=True
-            ):
+            if st.form_submit_button("Güncelle"):
               con = sqlite3.connect(DB_NAME)
               con.execute(
-                  """
-                            UPDATE books 
-                            SET title = ?, author = ?, publisher = ?, category = ?, age = ?, pages = ?
-                            WHERE id = ?
-                        """,
-                  (
-                      up_title,
-                      up_author,
-                      up_pub,
-                      up_cat,
-                      up_age,
-                      up_pages,
-                      eb["id"],
-                  ),
+                  "UPDATE books SET title = ?, author = ?, publisher = ?, language ="
+                  " ? WHERE id = ?",
+                  (up_title, up_author, up_pub, up_lang, eb["id"]),
               )
               con.commit()
               con.close()
-              st.success(f"'{up_title}' başarıyla güncellendi! 🎉")
-              st.cache_data.clear()
+              st.success("Güncellendi!")
               st.rerun()
 
     with adm_tab3:
-      st.subheader("🎨 Tüm Kütüphane Kapak Düzenleme ve Arama")
+      st.subheader("🎨 Kapak Düzenle")
       cover_search_query = st.text_input(
-          "🔍 Kitap veya Yazar Adına Göre Ara",
-          placeholder="Örn: Denizler Altında",
-          key="cover_search_input",
+          "🔍 Kitap Ara", key="cover_search_input"
+      )
+      filtered_cover_books = (
+          books_df[
+              books_df["title"]
+              .astype(str)
+              .str.contains(cover_search_query.strip(), case=False, na=False)
+          ]
+          if cover_search_query.strip()
+          else books_df[
+              books_df["cover_url"].isna() | (books_df["cover_url"] == "")
+          ]
       )
 
-      if cover_search_query.strip():
-        q_clean = cover_search_query.strip()
-        filtered_cover_books = books_df[
-            books_df["title"]
-            .astype(str)
-            .str.contains(q_clean, case=False, na=False)
-            | books_df["author"]
-            .astype(str)
-            .str.contains(q_clean, case=False, na=False)
-        ]
-      else:
-        filtered_cover_books = books_df[
-            books_df["cover_url"].isna() | (books_df["cover_url"] == "")
-        ]
-        st.caption(
-            "💡 Şu an sadece kapaksız kitaplar listeleniyor. Tüm kitaplar"
-            " arasında aramak için yukarıdaki kutucuğa yazın."
-        )
-
-      st.write(f"📚 Bulunan Kitap Sayısı: **{len(filtered_cover_books)}**")
-
-      if len(filtered_cover_books) > 0:
-        for _, b in filtered_cover_books.iterrows():
-          with st.form(f"quick_cover_{b['id']}"):
-            current_cover = b.get("cover_url")
-            cover_status = (
-                "✅ Kapak Var"
-                if current_cover and str(current_cover).strip() != ""
-                else "❌ Kapak Yok"
+      for _, b in filtered_cover_books.iterrows():
+        with st.form(f"quick_cover_{b['id']}"):
+          st.write(f"📖 {b['title']}")
+          new_url_val = st.text_input(
+              "Kapak URL", value=str(b.get("cover_url", "")), key=f"url_{b['id']}"
+          )
+          if st.form_submit_button("Kaydet"):
+            con = sqlite3.connect(DB_NAME)
+            con.execute(
+                "UPDATE books SET cover_url = ? WHERE id = ?",
+                (new_url_val, b["id"]),
             )
-            st.write(
-                f"📖 **{b['title']}** — *{b.get('author', 'Bilinmiyor')}*"
-                f" ({cover_status})"
-            )
-            new_url_val = st.text_input(
-                "Kapak Resim URL (örn: https://...)",
-                value=str(current_cover)
-                if current_cover and str(current_cover) != "nan"
-                else "",
-                key=f"url_in_{b['id']}",
-            )
-            if st.form_submit_button("Kapağı Kaydet"):
-              con = sqlite3.connect(DB_NAME)
-              con.execute(
-                  "UPDATE books SET cover_url = ? WHERE id = ?",
-                  (new_url_val, b["id"]),
-              )
-              con.commit()
-              con.close()
-              st.success(f"'{b['title']}' kapağı güncellendi!")
-              st.cache_data.clear()
-              st.rerun()
-      else:
-        st.info("Aramanıza uygun kitap bulunamadı.")
+            con.commit()
+            con.close()
+            st.success("Kapak güncellendi!")
+            st.rerun()
 
-    # YENİ EKLENEN SEKME: GÖRSELİ EKSİK OLAN KİTAPLAR
     with adm_missing_covers:
-      st.subheader("🖼️ Görseli Eksik Olan Kitaplar Listesi")
-      st.info(
-          "Aşağıda kapak görseli (cover_url) boş veya geçersiz olan tüm kitaplar"
-          " listelenmektedir. Hızlıca eksik görselleri tamamlayabilirsiniz."
-      )
-
+      st.subheader("🖼️ Görseli Eksik Olan Kitaplar ve Hızlı Kapak Ekleme")
       missing_df = books_df[
           books_df["cover_url"].isna() | (books_df["cover_url"] == "")
       ]
@@ -972,12 +950,12 @@ with tab4:
       if len(missing_df) > 0:
         for _, mb in missing_df.iterrows():
           with st.form(f"missing_cover_form_{mb['id']}"):
-            st.write(
+            st.markdown(
                 f"📖 **{mb['title']}** — *{mb.get('author', 'Bilinmiyor')}*"
                 f" ({mb.get('category', '-')})"
             )
             new_missing_url = st.text_input(
-                "Yeni Kapak URL", key=f"missing_url_{mb['id']}"
+                "Kapak Görsel URL", key=f"missing_url_{mb['id']}"
             )
             if st.form_submit_button("Kapak Ekle"):
               con = sqlite3.connect(DB_NAME)
@@ -988,7 +966,6 @@ with tab4:
               con.commit()
               con.close()
               st.success(f"'{mb['title']}' için kapak kaydedildi! 🎉")
-              st.cache_data.clear()
               st.rerun()
       else:
         st.success(
@@ -997,136 +974,85 @@ with tab4:
         )
 
     with adm_tab4:
-      st.subheader("↩️ En Son Okumayı Geri Al")
-      st.info(
-          "Bu işlem, ilgili kitabın sadece **en son okuma kaydını** siler ve"
-          " okunma sayacından 1 düşer."
-      )
+      st.subheader("↩ En Son Okumayı Geri Al")
       read_books_df_adm = books_df[books_df["read_count"] > 0]
-      if len(read_books_df_adm) > 0:
-        for _, rb in read_books_df_adm.iterrows():
-          col_rb1, col_rb2 = st.columns([3, 1])
-          with col_rb1:
-            st.write(
-                f"📖 **{rb['title']}** (Toplam Okunma:"
-                f" {int(rb['read_count'])})"
+      for _, rb in read_books_df_adm.iterrows():
+        col_rb1, col_rb2 = st.columns([3, 1])
+        with col_rb1:
+          st.write(
+              f"📖 **{rb['title']}** (Okunma: {int(rb['read_count'])})"
+          )
+        with col_rb2:
+          if st.button("Geri Al", key=f"undo_{rb['id']}"):
+            con = sqlite3.connect(DB_NAME)
+            last_log = con.execute(
+                "SELECT id FROM reading_log WHERE book_id = ? ORDER BY read_at"
+                " DESC LIMIT 1",
+                (rb["id"],),
+            ).fetchone()
+            if last_log:
+              con.execute("DELETE FROM reading_log WHERE id = ?", (last_log[0],))
+            con.execute(
+                "UPDATE books SET read_count = MAX(0, read_count - 1) WHERE id"
+                " = ?",
+                (rb["id"],),
             )
-          with col_rb2:
-            if st.button("Son Okumayı Geri Al", key=f"undo_read_{rb['id']}"):
-              con = sqlite3.connect(DB_NAME)
-              last_log = con.execute(
-                  "SELECT id FROM reading_log WHERE book_id = ? ORDER BY"
-                  " read_at DESC LIMIT 1",
-                  (rb["id"],),
-              ).fetchone()
-              if last_log:
-                con.execute(
-                    "DELETE FROM reading_log WHERE id = ?", (last_log[0],)
-                )
-              con.execute(
-                  "UPDATE books SET read_count = MAX(0, read_count - 1) WHERE id"
-                  " = ?",
-                  (rb["id"],),
-              )
-              con.commit()
-              con.close()
-              st.success(
-                  f"'{rb['title']}' için son okuma geri alındı ve sayaç"
-                  " güncellendi!"
-              )
-              st.cache_data.clear()
-              st.rerun()
-      else:
-        st.info("Okundu olarak işaretlenmiş kitap bulunmuyor.")
+            con.commit()
+            con.close()
+            st.success("Geri alındı!")
+            st.rerun()
 
     with adm_tab5:
       st.subheader("📊 Okuma Geçmişi Özeti")
       logs_list = rows("reading_log")
-      summary_map = {}
-      for l in logs_list:
-        bid = l.get("book_id")
-        rat = l.get("read_at", "")
-        if bid not in summary_map:
-          summary_map[bid] = {"count": 0, "last_read": ""}
-        summary_map[bid]["count"] += 1
-        if rat > summary_map[bid]["last_read"]:
-          summary_map[bid]["last_read"] = rat
+      if logs_list:
+        summary_map = {}
+        for l in logs_list:
+          bid = l.get("book_id")
+          rat = l.get("read_at", "")
+          if bid not in summary_map:
+            summary_map[bid] = {"count": 0, "last_read": ""}
+          summary_map[bid]["count"] += 1
+          if rat > summary_map[bid]["last_read"]:
+            summary_map[bid]["last_read"] = rat
 
-      summary_data = []
-      for _, b in books_df.iterrows():
-        b_id = b["id"]
-        if b_id in summary_map:
+        summary_data = []
+        book_dict = {b["id"]: b for b in books_df.to_dict("records")}
+        for b_id, data in summary_map.items():
+          b_info = book_dict.get(b_id, {})
           summary_data.append({
-              "Kitap Adı": b["title"],
-              "Yazar": b.get("author", "Bilinmiyor"),
-              "Toplam Okunma": summary_map[b_id]["count"],
-              "En Son Okunma Tarihi": summary_map[b_id]["last_read"][:19].replace(
-                  "T", " "
-              ),
+              "Kitap Adı": b_info.get("title", ""),
+              "Yazar": b_info.get("author", ""),
+              "Toplam Okunma": data["count"],
+              "En Son Okunma": data["last_read"][:19].replace("T", " "),
           })
-
-      if summary_data:
-        df_summary = pd.DataFrame(summary_data).sort_values(
-            by="En Son Okunma Tarihi", ascending=False
-        )
-        st.dataframe(df_summary, use_container_width=True)
+        st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
       else:
-        st.info("Henüz özetlenecek okunmuş kitap bulunmuyor.")
+        st.info("Kayıt yok.")
 
     with adm_tab6:
-      st.subheader("📝 Ham Okuma Log Geçmişi (Okunma Sayısı Dahil)")
-      logs = rows("reading_log")
-      books_list = rows("books")
-      book_dict = {b["id"]: b for b in books_list}
-
-      if logs:
-        log_data = []
-        for idx, l in enumerate(logs, start=1):
-          b_info = book_dict.get(l["book_id"], {})
-          log_data.append({
-              "Sıra": idx,
-              "Kitap Adı": b_info.get("title", "Bilinmeyen Kitap"),
-              "Yazar": b_info.get("author", "Bilinmiyor"),
-              "Okunma Sayısı": int(b_info.get("read_count", 0)),
-              "Okunma Tarihi": l.get("read_at", "")[:19].replace("T", " "),
-              "Durum": "Okundu ✅",
-          })
-        df_logs = pd.DataFrame(log_data)
-        st.dataframe(df_logs, use_container_width=True)
-      else:
-        st.info("Henüz hiçbir kitap okunmadı.")
+      st.subheader("📝 Ham Loglar")
+      st.dataframe(pd.DataFrame(rows("reading_log")), use_container_width=True)
 
     with adm_tab7:
-      st.subheader("🧹 Veri Sıfırlama")
-      st.warning(
-          "Bu buton veritabanındaki tüm okuma sayaçlarını ve okuma geçmişini"
-          " sıfırlar."
-      )
-      if st.button("Tüm Okuma Sayaçlarını ve Geçmişi Sıfırla"):
+      st.subheader("🧹 Sıfırlama")
+      if st.button("Tüm Sayaçları Sıfırla"):
         con = sqlite3.connect(DB_NAME)
         con.execute("UPDATE books SET read_count = 0")
         con.execute("DELETE FROM reading_log")
         con.commit()
         con.close()
-        st.success("Tüm okuma karnesi başarıyla sıfırlandı!")
-        st.cache_data.clear()
+        st.success("Sıfırlandı!")
         st.rerun()
 
     with adm_tab8:
-      st.subheader("💾 Canlı Veritabanı Yedeğini İndir")
-      st.info(
-          "Canlı sunucuda yapılan okumaları ve güncellemeleri kaybetmemek için"
-          " bu butona basarak veritabanı yedeğini (`atlas_library.db`) indirebilir"
-          " ve lokal bilgisayarınıza taşıyabilirsiniz."
-      )
+      st.subheader("💾 Veritabanı Yedek İndir")
       if os.path.exists(DB_NAME):
         with open(DB_NAME, "rb") as f:
           st.download_button(
-              label="📥 atlas_library.db Dosyasını İndir",
+              label="📥 atlas_library.db İndir",
               data=f,
               file_name="atlas_library.db",
               mime="application/x-sqlite3",
               use_container_width=True,
           )
-      else:
-        st.warning("Veritabanı dosyası bulunamadı.")
