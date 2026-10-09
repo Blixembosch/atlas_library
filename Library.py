@@ -3,7 +3,9 @@ import html
 import os
 from pathlib import Path
 import random
+import shutil  # V0.9 CHANGE: DB geri yükleme
 import sqlite3
+import tempfile  # V0.9 CHANGE: DB geri yükleme
 import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -51,12 +53,32 @@ section[data-testid="stSidebar"] div.stButton>button:hover{border-color:var(--pr
 
 /* Hero */
 .st-key-hero_box{background:linear-gradient(135deg,#4F7CFF 0%,#7C4DFF 100%);border-radius:var(--r-card);
-  padding:22px 26px;box-shadow:var(--shadow);margin-bottom:18px;}
-.hero-title{font-size:1.8rem;font-weight:900;color:#fff;margin-bottom:2px;}
+  padding:14px 20px 10px;box-shadow:var(--shadow);margin-bottom:14px;}
+/* V1.0 CHANGE: kompakt hero (hedef + seviye tek satırda) */
+.hero-top{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.hero-left{flex:1 1 280px;min-width:0;}
+.hero-right{flex:0 1 260px;min-width:200px;color:#fff;font-size:.85rem;}
+.hero-right .xp-track{height:8px;margin:4px 0 2px;}
+.hero-right .xp-text{color:#fff;opacity:.9;font-size:.75rem;}
+.hero-goalline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;margin:2px 0;}
+.hero-goalline b{font-size:.95rem;}
+.hero-title{font-size:1.35rem;font-weight:900;color:#fff;margin-bottom:2px;}
 .hero-sub{color:#fff;opacity:.95;margin:0 0 12px;font-weight:500;font-size:.95rem;}
 .hero-xp{color:#fff;font-size:.9rem;margin-bottom:14px;}
-.hero-xp .xp-track{background:rgba(255,255,255,.3);}
-.hero-xp .xp-fill{background:#fff;}
+.hero-right .xp-track{background:rgba(255,255,255,.3);}
+.hero-right .xp-fill{background:#fff;}
+
+/* V0.9 CHANGE: günlük hedef göstergesi */
+.goal-row{background:rgba(255,255,255,.16);border-radius:18px;padding:12px 16px;margin-bottom:14px;color:#fff;}
+.goal-label{font-weight:800;font-size:1rem;margin-bottom:8px;}
+.goal-slots{display:flex;gap:6px;}
+.goal-slot{width:30px;height:30px;border-radius:50%;border:2px dashed rgba(255,255,255,.7);
+  display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+.goal-slot.done{background:#fff;border:2px solid #fff;}
+.goal-slot.wait{background:rgba(255,255,255,.3);border:2px solid rgba(255,255,255,.8);}
+.goal-msg{font-size:.82rem;font-weight:600;color:#fff;opacity:.95;}
+.goal-streak{display:inline-block;background:#fff;color:#F97316;border-radius:99px;
+  padding:1px 10px;font-weight:800;font-size:.78rem;}
 .st-key-hero_box div.stButton>button{background:#fff;color:#4F7CFF!important;box-shadow:none;}
 
 /* XP bar */
@@ -101,6 +123,14 @@ div[class*="st-key-catON_"] button{border:2px solid #4F7CFF;}
 .stat-card small{color:#64748b;font-weight:800;}
 .stat-val{font-size:2rem;font-weight:900;color:#4F7CFF;}
 .cat-box{background:#fff;border-radius:var(--r-card);padding:16px;box-shadow:var(--shadow);}
+
+/* V0.9 CHANGE: dil özeti kartları */
+.lang-card{background:#fff;border-radius:var(--r-card);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px;}
+.lang-title{font-weight:800;font-size:1.05rem;margin-bottom:10px;}
+.lang-row{display:flex;gap:10px;}
+.lang-row div{flex:1;text-align:center;background:#F8FAFC;border-radius:16px;padding:10px 4px;}
+.lang-row b{display:block;font-size:1.6rem;font-weight:900;color:#4F7CFF;}
+.lang-row span{font-size:.75rem;color:#64748b;font-weight:700;}
 </style>
 """,
     unsafe_allow_html=True,
@@ -119,7 +149,125 @@ div.stButton>button:hover{transform:none;background:#334155;}
 """
 
 
+# V1.0 CHANGE: tek kategori listesi (ana sayfa, kütüphane ve yönetici formları kullanır)
+CATEGORIES = [
+    "Hikaye", "Bilgi & Keşif", "Aktivite", "İlk Okuma",
+    "Doğa & Hayvanlar", "Bilim", "Değerler",
+]
+
+# V1.0 CHANGE: kitap isimleri internette araştırılarak yapılan kategori incelemesi.
+# Yalnızca değişecek kitaplar: kitap_id -> (yeni kategori, gerekçe, güven)
+CATEGORY_REVIEW = {
+    "BÇ-1": ("Bilgi & Keşif", "Resimli sözlük / dil kitabı", "yüksek"),
+    "BÇ-3": ("Bilgi & Keşif", "Biyografi (Galileo)", "yüksek"),
+    "BÇ-4": ("Hikaye", "Jules Verne uyarlaması, kurgu", "yüksek"),
+    "BÇ-5": ("Bilgi & Keşif", "Ressam tanıtım serisi (sanat bilgisi)", "yüksek"),
+    "BÇ-6": ("Aktivite", "Satranç öğreten etkileşimli kitap", "yüksek"),
+    "BÇ-9": ("Hikaye", "Minik Ayıcıklar: hayvan karakterli kurgu hikâye", "yüksek"),
+    "BÇ-10": ("Hikaye", "Minik Ayıcıklar: hayvan karakterli kurgu hikâye", "yüksek"),
+    "BÇ-11": ("Hikaye", "Minik Ayıcıklar: hayvan karakterli kurgu hikâye", "yüksek"),
+    "BÇ-12": ("Hikaye", "Minik Ayıcıklar: hayvan karakterli kurgu hikâye", "yüksek"),
+    "BÇ-13": ("Bilgi & Keşif", "Ressam tanıtım serisi (sanat bilgisi)", "yüksek"),
+    "BÇ-17": ("Bilgi & Keşif", "Ressam tanıtım serisi (sanat bilgisi)", "yüksek"),
+    "BÇ-18": ("Değerler", "Günlük alışkanlık / beslenme teması", "yüksek"),
+    "ABM-7": ("Hikaye", "Kurgu hikâye (kuş karakteri)", "orta"),
+    "ABM-8": ("Bilgi & Keşif", "Finansal okuryazarlık bilgi kitabı", "yüksek"),
+    "ABM-15": ("Değerler", "Yemek/günlük yaşam alışkanlığı", "orta"),
+    "ABM-22": ("Aktivite", "Düğmeli etkileşimli aktivite kitabı (kitapyurdu yorumları)", "yüksek"),
+    "ABM-27": ("Aktivite", "Yoga hareketleri, etkinlik", "yüksek"),
+    "AK-1": ("Hikaye", "Hayvan karakterli kurgu hikâye", "yüksek"),
+    "AK-2": ("Hikaye", "Hayvan karakterli kurgu hikâye", "yüksek"),
+    "AK-4": ("Hikaye", "İlk Okuma yalnızca Cin Ali serisi; kitap doğrulanamadı", "düşük"),
+    "AK-5": ("Değerler", "Peter H. Reynolds: yaratıcılık/cesaret teması", "yüksek"),
+    "AR-1": ("Hikaye", "Masal derlemesi", "yüksek"),
+    "BY-1": ("Değerler", "Tuvalet alışkanlığı, günlük yaşam", "yüksek"),
+    "BTK-1": ("Bilgi & Keşif", "Finansal okuryazarlık", "yüksek"),
+    "BTK-2": ("Bilgi & Keşif", "Finansal okuryazarlık", "yüksek"),
+    "CÇ-1": ("Hikaye", "Hayvan karakterli kurgu hikâye", "yüksek"),
+    "DK-7": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-8": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-10": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-21": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-23": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-24": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DK-26": ("Hikaye", "Mr. Men / Little Miss serisi: karakter hikâyesi", "yüksek"),
+    "DO-1": ("Hikaye", "Hayvanlı mizahi resimli kitap (kitapyurdu)", "yüksek"),
+    "DO-3": ("Bilgi & Keşif", "Atlas: coğrafya / kültür", "yüksek"),
+    "DO-5": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-6": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-7": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-8": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-9": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-10": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-11": ("Bilgi & Keşif", "Dahiler Sınıfı: biyografi serisi (internetten doğrulandı)", "yüksek"),
+    "DO-13": ("Bilgi & Keşif", "Meslek tanıtımı", "yüksek"),
+    "DO-28": ("Bilgi & Keşif", "Genel bilgi (yer altı / su altı)", "orta"),
+    "HK-1": ("Hikaye", "Kurgu hikâye", "orta"),
+    "KKÇ-3": ("Bilgi & Keşif", "Atatürk serisi: tarih / bilgi", "yüksek"),
+    "KKÇ-4": ("Bilgi & Keşif", "Atatürk serisi: tarih / bilgi", "yüksek"),
+    "NC-1": ("Doğa & Hayvanlar", "Doğa temalı resimli sözlük", "yüksek"),
+    "RH-1": ("Hikaye", "Resimli hikâye (başlıktan; doğrulanamadı)", "orta"),
+    "RH-9": ("Bilgi & Keşif", "Genel bilgi", "orta"),
+    "RH-10": ("Hikaye", "Sessiz kitap, kurgu (kitapyurdu: Hikâye)", "yüksek"),
+    "RH-11": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-12": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-13": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-15": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-16": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-17": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-18": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-19": ("Değerler", "Sorumluluk temalı bahar öyküsü (kitapyurdu)", "yüksek"),
+    "RH-24": ("Hikaye", "Hayvan/insan karakterli kurgu hikâye", "orta"),
+    "RH-25": ("Hikaye", "Resimli hikâye (kitapyurdu: Hikâye)", "yüksek"),
+    "STU-1": ("Aktivite", "Ara-bul (zoek boek) etkinlik kitabı", "yüksek"),
+    "TB-2": ("Doğa & Hayvanlar", "TÜBİTAK doğa resimli kitabı; doğrulanamadı", "düşük"),
+    "TB-7": ("Bilim", "Dağların oluşumu: jeoloji bilgisi", "orta"),
+    "TB-14": ("Doğa & Hayvanlar", "Gece hayvanları: bilgilendirici (kitapyurdu)", "yüksek"),
+    "TB-18": ("Doğa & Hayvanlar", "İmparator penguen yumurtası: doğa", "orta"),
+    "TB-23": ("Doğa & Hayvanlar", "Kuzey Kutbu: bilgilendirici doğa kitabı (kitapyurdu)", "yüksek"),
+    "TİB-3": ("Doğa & Hayvanlar", "Orman: doğa bilgisi", "yüksek"),
+    "TİB-4": ("Hikaye", "Hayvan karakterli kurgu hikâye", "yüksek"),
+    "TİB-5": ("Bilgi & Keşif", "Genel bilgi", "yüksek"),
+    "TİB-7": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-8": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-9": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-10": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-11": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-12": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-13": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-14": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-15": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-16": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-17": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-18": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-19": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-20": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-21": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-22": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-23": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-24": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-25": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-26": ("Bilgi & Keşif", "Meslek tanıtım serisi", "yüksek"),
+    "TİB-29": ("Doğa & Hayvanlar", "Doğa / hayvan bilgisi", "yüksek"),
+    "TİB-30": ("Doğa & Hayvanlar", "Doğa / hayvan bilgisi", "yüksek"),
+    "TİB-32": ("Bilgi & Keşif", "Günlük yaşam / uygarlık bilgisi", "yüksek"),
+    "TİB-37": ("Doğa & Hayvanlar", "Doğa / hayvan bilgisi", "yüksek"),
+    "TİB-38": ("Doğa & Hayvanlar", "Doğa / hayvan bilgisi", "yüksek"),
+    "TİB-42": ("Bilgi & Keşif", "Günlük yaşam / uygarlık bilgisi", "yüksek"),
+    "TİB-48": ("Değerler", "Diş fırçalama alışkanlığı", "yüksek"),
+    "TİB-58": ("Hikaye", "İlk Okuma Kitabım serisi tek tipte Hikaye", "orta"),
+    "TİB-60": ("Hikaye", "İlk Okuma Kitabım serisi tek tipte Hikaye", "orta"),
+    "TİB-68": ("Doğa & Hayvanlar", "Hayvan tanıtım kitabı", "yüksek"),
+    "TİB-73": ("Hikaye", "Hayvan karakterli kurgu hikâye", "orta"),
+    "YKY-1": ("Bilgi & Keşif", "Genel bilgi (Büyük Sorular)", "yüksek"),
+    "YKY-3": ("Doğa & Hayvanlar", "Böcek/doğa teması", "orta"),
+    "YKY-7": ("Hikaye", "Kurgu hikâye", "orta"),
+}
+
+
 def akilli_kategori_belirle(title, author, subcategory=""):
+  # V1.0 CHANGE: anahtar kelime tahmini ("kg", "dünya", "sayı"... hepsini Bilim yapıyordu)
+  # kaldırıldı; yalnızca Cin Ali serisi İlk Okuma olarak kalır.
   t = str(title).lower()
   a = str(author).lower()
   sub = str(subcategory).lower()
@@ -128,29 +276,6 @@ def akilli_kategori_belirle(title, author, subcategory=""):
   if "çin ali" in combined or "cin ali" in combined:
     return "İlk Okuma"
 
-  bilim_kelimeler = [
-      "bilim",
-      "matematik",
-      "problem",
-      "kg",
-      "kilogram",
-      "ölç",
-      "sayı",
-      "uzay",
-      "deney",
-      "fizik",
-      "kimya",
-      "gezegeni",
-      "robot",
-      "kodlama",
-      "mucit",
-      "icat",
-      "dünya",
-      "evren",
-      "yıldız",
-  ]
-  if any(k in combined for k in bilim_kelimeler):
-    return "Bilim"
   return None
 
 
@@ -165,8 +290,9 @@ def fetch_book_by_isbn(isbn):
     if res.status_code == 200:
       data = res.json()
       title = data.get("title", "")
-      pages = data.get("number_of_pages", 28)
-      
+      # V0.9 CHANGE: sayfa bilgisi yoksa varsayılan (28) EKLEME, boş bırak
+      pages = data.get("number_of_pages")
+
       # Yazar bilgisi
       author = "Bilinmiyor"
       authors_data = data.get("authors", [])
@@ -189,13 +315,21 @@ def fetch_book_by_isbn(isbn):
           "title": title,
           "author": author,
           "publisher": publisher,
-          "pages": int(pages) if pages else 28,
+          "pages": int(pages) if pages else None,  # V0.9 CHANGE
           "cover_url": cover_url,
           "isbn": clean_isbn
       }
   except Exception:
     pass
   return None
+
+
+# V0.9 CHANGE: kapak yerine kullanılmaması gereken görseller (tek yerden yönetilir)
+BAD_COVER_MARKERS = ("longitood.com", "deneyap-logo")
+
+
+def _is_bad_cover(url):
+  return any(m in str(url) for m in BAD_COVER_MARKERS)
 
 
 def db():
@@ -206,10 +340,12 @@ def db():
       " NULL,publisher TEXT,pages INTEGER,author TEXT,isbn TEXT,age"
       " TEXT,category TEXT,subcategory TEXT,cover_url TEXT,language TEXT"
       " DEFAULT 'Türkçe',read_count INTEGER DEFAULT 0,created_at TEXT,"
-      " is_school INTEGER DEFAULT 0); "
+      " is_school INTEGER DEFAULT 0, is_outgrown INTEGER DEFAULT 0); "
       "CREATE TABLE IF NOT EXISTS reading_log(id INTEGER PRIMARY KEY"
       " AUTOINCREMENT,book_id TEXT,status TEXT,read_at TEXT,cycle INTEGER"
-      " DEFAULT 1);"
+      " DEFAULT 1); "
+      # V0.9 CHANGE: günlük hedef gibi ayarlar için
+      "CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);"
   )
 
   cursor = con.cursor()
@@ -220,6 +356,10 @@ def db():
     con.commit()
   if "is_school" not in columns:
     cursor.execute("ALTER TABLE books ADD COLUMN is_school INTEGER DEFAULT 0")
+    con.commit()
+  # V1.0 CHANGE: yaşı geçen kitaplar için bayrak (öneri havuzundan çıkar)
+  if "is_outgrown" not in columns:
+    cursor.execute("ALTER TABLE books ADD COLUMN is_outgrown INTEGER DEFAULT 0")
     con.commit()
 
   if con.execute("select count() from books").fetchone()[0] == 0:
@@ -233,7 +373,7 @@ def db():
         df["language"] = "Türkçe"
       if "cover_url" in df.columns:
         df["cover_url"] = df["cover_url"].apply(
-            lambda x: "" if "longitood.com" in str(x) else x
+            lambda x: "" if _is_bad_cover(x) else x  # V0.9 CHANGE
         )
 
       def apply_smart_cat(row):
@@ -252,17 +392,19 @@ def db():
         "UPDATE books SET cover_url = '' WHERE cover_url LIKE"
         " '%longitood.com%'"
     )
+    # V0.9 CHANGE: kapak yerine konmuş site logosunu temizle
+    con.execute(
+        "UPDATE books SET cover_url = '' WHERE cover_url LIKE '%deneyap-logo%'"
+    )
+    # V0.9 CHANGE: okul kitapları her zaman Dutch
+    con.execute(
+        "UPDATE books SET language = 'Dutch' WHERE is_school = 1"
+        " AND (language IS NULL OR language != 'Dutch')"
+    )
     con.commit()
 
-  all_b = con.execute(
-      "SELECT id, title, author, subcategory, category FROM books"
-  ).fetchall()
-  for b in all_b:
-    smart = akilli_kategori_belirle(
-        b["title"], b["author"], b["subcategory"]
-    )
-    if smart:
-      con.execute("UPDATE books SET category = ? WHERE id = ?", (smart, b["id"]))
+  # V1.0 CHANGE: kategori artık her açılışta ezilmez; yönetici seçimi kalıcıdır.
+  con.execute("UPDATE books SET category = 'İlk Okuma' WHERE category IS NULL OR category = ''")
   con.commit()
 
   return con
@@ -281,7 +423,7 @@ def rows(table):
 def cover(url):
   if not url or str(url).strip() == "" or str(url).lower() == "nan":
     return None
-  if "longitood.com" in str(url):
+  if _is_bad_cover(url):  # V0.9 CHANGE
     return None
   return str(url).strip()
 
@@ -298,10 +440,21 @@ def get_books_df():
     df["language"] = "Türkçe"
   if "is_school" not in df.columns:
     df["is_school"] = 0
+  # V0.9 CHANGE: sayfa boşsa NaN kalsın (varsayılan yok), okul bayrağı her zaman 0/1
+  df["pages"] = pd.to_numeric(df["pages"], errors="coerce")
+  df["is_school"] = pd.to_numeric(df["is_school"], errors="coerce").fillna(0).astype(int)
+  # V1.0 CHANGE: yaşı geçti bayrağı
+  if "is_outgrown" not in df.columns:
+    df["is_outgrown"] = 0
+  df["is_outgrown"] = pd.to_numeric(df["is_outgrown"], errors="coerce").fillna(0).astype(int)
   return df
 
 
 books_df = get_books_df()
+# V0.9 CHANGE: okuldan gelen kitaplar kütüphanede durmaz; sadece sayımlara girer
+home_df = books_df[books_df["is_school"] == 0]
+# V1.0 CHANGE: öneri/kategori sayaçları sadece yaşına uygun kitapları sayar
+eligible_df = home_df[home_df["is_outgrown"] == 0]
 
 if "selected_category" not in st.session_state:
   st.session_state.selected_category = "Tümü"
@@ -313,6 +466,10 @@ if "nav_page" not in st.session_state:
   st.session_state.nav_page = "Ana Sayfa"
 if "home_active_category" not in st.session_state:
   st.session_state.home_active_category = "Tümü"
+if "featured_note" not in st.session_state:  # V0.9 CHANGE
+  st.session_state.featured_note = ""
+if "goal_celebrated" not in st.session_state:  # V0.9 CHANGE
+  st.session_state.goal_celebrated = ""
 
 
 # XP / Seviye Sistem Fonksiyonları
@@ -330,45 +487,260 @@ def level_bar_html(lv):
   )
 
 
+# V0.9 CHANGE: okul kitapları da okunmuş sayılır (XP, rozet, yolculuk)
 total_read_books = int((books_df["read_count"] > 0).sum())
 lvl = calculate_level(total_read_books)
 
 
+# V0.9 CHANGE: Türkçe / Dutch okuma özeti (her okuma kaydı kitabın diline göre sayılır)
+def language_read_summary(logs, books):
+  lang_of = dict(zip(books["id"], books["language"].fillna("Türkçe")))
+  now = datetime.now(TZ)
+  out = {}
+  for l in logs:
+    lang = lang_of.get(l.get("book_id"))
+    if lang is None:  # silinmiş kitabın eski kaydı
+      continue
+    group = lang if lang in ("Türkçe", "Dutch") else "Diğer"
+    row = out.setdefault(group, {"total": 0, "year": 0, "month": 0})
+    row["total"] += 1
+    try:
+      dt = datetime.fromisoformat(l.get("read_at"))
+    except (TypeError, ValueError):
+      continue
+    if dt.year == now.year:
+      row["year"] += 1
+      if dt.month == now.month:
+        row["month"] += 1
+  return out
+
+
+def lang_card_html(title, d):
+  d = d or {"month": 0, "year": 0, "total": 0}
+  return (
+      f'<div class="lang-card"><div class="lang-title">{title}</div><div class="lang-row">'
+      f'<div><b>{d["month"]}</b><span>Bu Ay</span></div>'
+      f'<div><b>{d["year"]}</b><span>Bu Yıl</span></div>'
+      f'<div><b>{d["total"]}</b><span>Toplam</span></div></div></div>'
+  )
+
+
+# V0.9 CHANGE: veritabanı geri yükleme (yönetici paneli > DB Yedek)
+PRE_RESTORE_PATH = Path("data") / "pre_restore.db"  # data/*.db zaten .gitignore'da
+
+
+def summarize_db(path):
+  """Dosya geçerli bir Atlas veritabanıysa {'books','logs','pending'} döner, değilse None."""
+  try:
+    con = sqlite3.connect(path)
+    try:
+      if con.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        return None
+      tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+      if not {"books", "reading_log"} <= tables:
+        return None
+      bcols = {r[1] for r in con.execute("PRAGMA table_info(books)")}
+      lcols = {r[1] for r in con.execute("PRAGMA table_info(reading_log)")}
+      if not ({"id", "title"} <= bcols and {"book_id", "read_at"} <= lcols):
+        return None
+      pending = (
+          con.execute("SELECT count(*) FROM reading_log WHERE status = 'pending'").fetchone()[0]
+          if "status" in lcols
+          else 0
+      )
+      return {
+          "books": con.execute("SELECT count(*) FROM books").fetchone()[0],
+          "logs": con.execute("SELECT count(*) FROM reading_log").fetchone()[0],
+          "pending": pending,
+      }
+    finally:
+      con.close()
+  except sqlite3.Error:
+    return None
+
+
+def _write_temp_db(data):
+  tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+  tmp.write(data)
+  tmp.close()
+  return tmp.name
+
+
+def inspect_backup(data):
+  """Yüklenen dosyayı geçici kopyada doğrular. (özet, hata_mesajı) döner."""
+  if not data.startswith(b"SQLite format 3\x00"):
+    return None, "Bu dosya bir SQLite veritabanı değil. İndirdiğin atlas_library.db dosyasını seç."
+  tmp = _write_temp_db(data)
+  try:
+    info = summarize_db(tmp)
+  finally:
+    os.remove(tmp)
+  if info is None:
+    return None, "Dosya bozuk ya da Atlas veritabanı değil (books / reading_log tabloları bulunamadı)."
+  return info, None
+
+
+def restore_db(data):
+  """Önce mevcut DB'nin kopyasını alır, sonra yüklenen yedeği SQLite backup API ile yazar."""
+  tmp = _write_temp_db(data)
+  try:
+    if os.path.exists(DB_NAME):
+      PRE_RESTORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+      shutil.copyfile(DB_NAME, PRE_RESTORE_PATH)
+    src = sqlite3.connect(tmp)
+    dst = sqlite3.connect(DB_NAME)
+    try:
+      src.backup(dst)
+    finally:
+      src.close()
+      dst.close()
+  finally:
+    os.remove(tmp)
+  db().close()  # eski şemalı yedekler için eksik sütun/tabloları tamamlar
+
+
+# V0.9 CHANGE: ayarlar (günlük hedef vb.)
+def get_setting(key, default):
+  con = sqlite3.connect(DB_NAME)
+  r = con.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+  con.close()
+  return r[0] if r else default
+
+
+def set_setting(key, value):
+  con = sqlite3.connect(DB_NAME)
+  con.execute(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value))
+  )
+  con.commit()
+  con.close()
+
+
+def daily_goal():
+  try:
+    return max(1, int(get_setting("daily_goal", "2")))
+  except (TypeError, ValueError):
+    return 2
+
+
+# V0.9 CHANGE: okuma kaydı durumları. 'pending' = çocuk işaretledi, ebeveyn onayı bekliyor.
+# Eski kayıtlarda status boş olabilir, onaylı sayılır.
+def is_pending(log):
+  return log.get("status") == "pending"
+
+
+def approved_logs(logs):
+  return [l for l in logs if not is_pending(l)]
+
+
+def approve_reading(log_id):
+  con = sqlite3.connect(DB_NAME)
+  row = con.execute(
+      "SELECT book_id, status FROM reading_log WHERE id = ?", (log_id,)
+  ).fetchone()
+  if row and row[1] == "pending":
+    con.execute("UPDATE reading_log SET status = 'read' WHERE id = ?", (log_id,))
+    con.execute(
+        "UPDATE books SET read_count = read_count + 1 WHERE id = ?", (row[0],)
+    )
+    con.commit()
+  con.close()
+
+
+def reject_reading(log_id):
+  con = sqlite3.connect(DB_NAME)
+  con.execute("DELETE FROM reading_log WHERE id = ? AND status = 'pending'", (log_id,))
+  con.commit()
+  con.close()
+
+
+def goal_status():
+  """Bugünün hedefi: onaylanan, bekleyen, kalan ve üst üste hedef tutturulan gün serisi."""
+  goal = daily_goal()
+  today = datetime.now(TZ).date()
+  today_iso = today.isoformat()
+  per_day, pending = {}, 0
+  for l in rows("reading_log"):
+    day = (l.get("read_at") or "")[:10]
+    if is_pending(l):
+      if day == today_iso:
+        pending += 1
+    else:
+      per_day[day] = per_day.get(day, 0) + 1
+  done = per_day.get(today_iso, 0)
+  # Seri: bugün tamamsa bugünden, değilse dünden geriye hedefi tutturan günler
+  streak = 0
+  d = today if done >= goal else today - timedelta(days=1)
+  while per_day.get(d.isoformat(), 0) >= goal:
+    streak += 1
+    d -= timedelta(days=1)
+  return {
+      "goal": goal,
+      "done": done,
+      "pending": pending,
+      "remaining": max(goal - done - pending, 0),
+      "streak": streak,
+      "today_iso": today_iso,
+  }
+
+
 def get_pool_df():
   df = get_books_df()
+  df = df[df["is_school"] == 0]  # V0.9 CHANGE: okul kitapları öneri havuzunda yok
+  df = df[df["is_outgrown"] == 0]  # V1.0 CHANGE: yaşı geçen kitaplar asla önerilmez
   if datetime.now(TZ).hour >= 19:
     df = df[df["category"] != "Aktivite"]
   return df
 
 
+# V0.9 CHANGE: öneri havuzu = henüz hiç okunmamış (ve onay beklemeyen) kitaplar.
+# Okunmamış kitap kalmadıysa (veya kategoride kalmadıysa) tüm havuza düşer.
+def get_unread_pool(cat=None):
+  df = get_pool_df()
+  if cat and cat != "Tümü":
+    df = df[df["category"] == cat]
+  pending_ids = {l["book_id"] for l in rows("reading_log") if is_pending(l)}
+  unread = df[(df["read_count"] == 0) & (~df["id"].isin(pending_ids))]
+  return unread if len(unread) > 0 else df
+
+
+# V0.9 CHANGE: ekranda zaten gösterilen kitapları tekrar önermemeye çalışır
+def sample_books(pool, n):
+  shown = {b["id"] for b in st.session_state.current_featured_books}
+  fresh = pool[~pool["id"].isin(shown)]
+  src = fresh if len(fresh) >= n else pool
+  return src.sample(n=min(n, len(src))).to_dict(orient="records")
+
+
 def spin_wheel():
-  pool = get_pool_df()
+  pool = get_unread_pool()
   if len(pool) == 0:
     return
-  unread = pool[pool["read_count"] == 0]
-  target = unread if len(unread) > 0 else pool
-  st.session_state.current_featured_books = target.sample(
-      n=min(2, len(target))
-  ).to_dict(orient="records")
+  gs = goal_status()
+  # V0.9 CHANGE: çark bugünün kalan hedefi kadar kitap önerir (hedef bittiyse 1 bonus)
+  n = gs["remaining"] if gs["remaining"] > 0 else 1
+  st.session_state.current_featured_books = sample_books(pool, n)
+  st.session_state.featured_note = (
+      f"🎡 Çark bugün için {n} kitap seçti!"
+      if gs["remaining"] > 0
+      else "🎉 Bugünkü hedef tamam! Çark sana 1 bonus kitap seçti."
+  )
 
 
 def random_pick():
-  pool = get_pool_df()
+  pool = get_unread_pool()
   if len(pool) > 0:
-    st.session_state.current_featured_books = pool.sample(
-        n=min(4, len(pool))
-    ).to_dict(orient="records")
+    st.session_state.current_featured_books = sample_books(pool, 4)
+    st.session_state.featured_note = ""
 
 
 def pick_category(cat):
   st.session_state.home_active_category = cat
-  pool = get_pool_df()
-  sub = pool if cat == "Tümü" else pool[pool["category"] == cat]
+  pool = get_unread_pool(cat)
   st.session_state.current_featured_books = (
-      sub.sample(n=min(4, len(sub))).to_dict(orient="records")
-      if len(sub) > 0
-      else []
+      sample_books(pool, 4) if len(pool) > 0 else []
   )
+  st.session_state.featured_note = ""
 
 
 # --- SOL KENAR ÇUBUĞU ---
@@ -400,8 +772,10 @@ with st.sidebar:
 
   st.markdown('<div class="side-label">OKUMA DURUMUM</div>', unsafe_allow_html=True)
 
-  total_books = len(books_df)
-  logs_data = rows("reading_log")
+  total_books = len(home_df)  # V0.9 CHANGE: sadece ev kütüphanesi (okul kitapları iade edilir)
+  all_logs = rows("reading_log")
+  pending_logs = [l for l in all_logs if is_pending(l)]  # V0.9 CHANGE
+  logs_data = approved_logs(all_logs)  # istatistikler yalnızca onaylı okumaları sayar
 
   now_dt = datetime.now(TZ)
   current_month = now_dt.month
@@ -443,7 +817,7 @@ with st.sidebar:
           f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
           f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
           f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
-          '<div class="side-ver">Atlas v0.8.3</div>',
+          '<div class="side-ver">Atlas v1.0</div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -462,11 +836,16 @@ def show_book_detail(b_id):
   c_img = cover(b.get("cover_url"))
 
   logs_list = rows("reading_log")
-  book_logs = [l for l in logs_list if l.get("book_id") == b_id]
+  all_book_logs = [l for l in logs_list if l.get("book_id") == b_id]
+  book_logs = approved_logs(all_book_logs)  # V0.9 CHANGE: son okuma yalnızca onaylılardan
+  # V0.9 CHANGE: bu kitap için onay bekleyen kayıt var mı / bugün zaten okundu mu
+  today_iso = datetime.now(TZ).date().isoformat()
+  has_pending = any(is_pending(l) for l in all_book_logs)
+  read_today = any((l.get("read_at") or "")[:10] == today_iso for l in book_logs)
   last_read_time = "Henüz okunmadı"
   if book_logs:
     sorted_logs = sorted(
-        book_logs, key=lambda x: x.get("read_at", ""), reverse=True
+        book_logs, key=lambda x: x.get("read_at") or "", reverse=True
     )
     rat = sorted_logs[0].get("read_at")
     if rat:
@@ -488,7 +867,9 @@ def show_book_detail(b_id):
     st.markdown(f"✍️ **Yazar:** {b.get('author', 'Bilinmiyor')}")
     st.markdown(f"🏢 **Yayınevi:** {b.get('publisher', 'Bilinmiyor')}")
     st.markdown(f"📌 **ISBN Numarası:** {b.get('isbn', 'Bulunmuyor')}")
-    st.markdown(f"📄 **Sayfa Sayısı:** {b.get('pages', '-')}")
+    # V0.9 CHANGE: sayfa bilgisi yoksa satırı gösterme
+    if pd.notna(b.get("pages")):
+      st.markdown(f"📄 **Sayfa Sayısı:** {int(b['pages'])}")
     st.markdown(
         f"📂 **Kategori:** {b.get('category', '-')} &nbsp;|&nbsp; 🎯 **Yaş:**"
         f" {b.get('age', '-')}"
@@ -498,33 +879,63 @@ def show_book_detail(b_id):
     st.markdown(f"⏱️ **En Son Okunma Tarihi:** {last_read_time}")
 
   st.markdown("---")
-  st.markdown("#### 📅 Geçmiş Okuma Tarihi Gir")
-  with st.form(f"manual_read_form_{b_id}"):
-    selected_date = st.date_input(
-        "Okunan Tarih Seçin", value=datetime.now(TZ).date()
-    )
-    selected_time = st.time_input(
-        "Okunan Saat Seçin", value=datetime.now(TZ).time()
-    )
-    if st.form_submit_button(
-        "📝 Bu Tarihle Okundu Olarak Kaydet", use_container_width=True
+  # V0.9 CHANGE: çocuk "Okudum" der -> kayıt 'pending' olur, ebeveyn onaylayınca sayılır.
+  # Aynı kitap günde en fazla 1 kez işaretlenebilir (üst üste basma oyunu biter).
+  if has_pending:
+    st.info("⏳ Okuman kaydedildi! Annen ya da baban onaylayınca XP kazanacaksın.")
+  elif read_today:
+    st.success("✅ Bu kitabı bugün zaten okudun. Yarın tekrar okuyabilirsin!")
+  else:
+    if st.button(
+        "✅ Okudum! 🎉",
+        key=f"mark_read_{b_id}",
+        type="primary",
+        use_container_width=True,
     ):
-      combined_dt = datetime.combine(selected_date, selected_time).isoformat()
       con = sqlite3.connect(DB_NAME)
-      con.execute(
-          "UPDATE books SET read_count = read_count + 1 WHERE id = ?", (b_id,)
-      )
-      con.execute(
-          "INSERT INTO reading_log (book_id, status, read_at, cycle) VALUES"
-          " (?, 'read', ?, 1)",
-          (b_id, combined_dt),
-      )
-      con.commit()
+      dup = con.execute(
+          "SELECT 1 FROM reading_log WHERE book_id = ? AND (status = 'pending'"
+          " OR substr(read_at, 1, 10) = ?)",
+          (b_id, today_iso),
+      ).fetchone()
+      if not dup:
+        con.execute(
+            "INSERT INTO reading_log (book_id, status, read_at, cycle) VALUES"
+            " (?, 'pending', ?, 1)",
+            (b_id, datetime.now(TZ).replace(tzinfo=None).isoformat(timespec="seconds")),
+        )
+        con.commit()
       con.close()
-      st.success(
-          f"'{b['title']}' başarıyla {selected_date} tarihiyle kaydedildi! 🎉"
-      )
+      st.toast("Harika! Onay bekliyor ⏳", icon="🎉")
       st.rerun()
+
+  # V0.9 CHANGE: geçmiş tarihli kayıt yalnızca yönetici oturumunda görünür, doğrudan onaylı yazılır
+  if st.session_state.admin_logged_in:
+    with st.expander("🔐 Yönetici: geçmiş tarihli okuma ekle"):
+      with st.form(f"manual_read_form_{b_id}"):
+        selected_date = st.date_input(
+            "Okunan Tarih Seçin", value=datetime.now(TZ).date()
+        )
+        selected_time = st.time_input(
+            "Okunan Saat Seçin", value=datetime.now(TZ).time()
+        )
+        if st.form_submit_button(
+            "📝 Bu Tarihle Okundu Olarak Kaydet", use_container_width=True
+        ):
+          combined_dt = datetime.combine(selected_date, selected_time).isoformat()
+          con = sqlite3.connect(DB_NAME)
+          con.execute(
+              "UPDATE books SET read_count = read_count + 1 WHERE id = ?", (b_id,)
+          )
+          con.execute(
+              "INSERT INTO reading_log (book_id, status, read_at, cycle) VALUES"
+              " (?, 'read', ?, 1)",
+              (b_id, combined_dt),
+          )
+          con.commit()
+          con.close()
+          st.toast(f"'{b['title']}' {selected_date} tarihiyle kaydedildi! 🎉", icon="✅")
+          st.rerun()
 
   if st.button("Kapat", use_container_width=True):
     st.rerun()
@@ -551,11 +962,16 @@ def book_card(b, prefix, cover_h=170):
   school_badge_html = (
       '<div class="school-badge">🏫 Okul Kitabı</div>' if is_sch else ""
   )
+  # V1.0 CHANGE: yaşı geçen kitapların etiketi
+  if int(b.get("is_outgrown", 0) or 0) == 1:
+    badge_html = '<div class="book-badge">🎒 Yaşı Geçti</div>'
 
+  # V0.9 CHANGE: sayfa bilgisi yoksa satır hiç gösterilmez
   try:
-    pages = int(float(b.get("pages")))
+    pages_num = float(b.get("pages"))
+    pages_line = "" if pd.isna(pages_num) else f"<br>📄 {int(pages_num)} Sayfa"
   except (TypeError, ValueError):
-    pages = "-"
+    pages_line = ""
 
   st.markdown(
       "".join([
@@ -563,7 +979,7 @@ def book_card(b, prefix, cover_h=170):
           f'<div class="book-cover" style="height:{cover_h}px">{cover_html}</div>',
           f'<div class="book-title">{html.escape(str(b["title"]))}</div>',
           f'<div class="book-meta">👶 {html.escape(str(b.get("age", "-")))}'
-          f'<br>📄 {pages} Sayfa<br>🔄 {rc} Kez Okundu</div></div>',
+          f'{pages_line}<br>🔄 {rc} Kez Okundu</div></div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -576,19 +992,51 @@ active_page = st.session_state.nav_page
 
 # 1. ANA SAYFA
 if active_page == "Ana Sayfa":
-  pool_df = get_pool_df()
   active_cat_label = st.session_state.home_active_category
+
+  # V0.9 CHANGE: günlük hedef göstergesi (✅ onaylı, ⏳ onay bekliyor, boş yuva) ve seri
+  gs = goal_status()
+  slots = "".join(
+      '<div class="goal-slot done">✅</div>'
+      if i < gs["done"]
+      else (
+          '<div class="goal-slot wait">⏳</div>'
+          if i < gs["done"] + gs["pending"]
+          else '<div class="goal-slot"></div>'
+      )
+      for i in range(gs["goal"])
+  )
+  if gs["done"] >= gs["goal"]:
+    goal_msg = "🎉 Bugünkü görevi tamamladın!"
+    if gs["done"] > gs["goal"]:
+      goal_msg += f" (+{gs['done'] - gs['goal']} bonus)"
+  elif gs["pending"] > 0:
+    goal_msg = "⏳ Onay bekleniyor, annen ya da baban onaylayınca yuva dolar."
+  else:
+    goal_msg = f"Bugün {gs['remaining']} kitap daha oku!"
+  streak_html = (
+      f'<span class="goal-streak">🔥 {gs["streak"]} gün üst üste</span>'
+      if gs["streak"] > 0
+      else ""
+  )
 
   with st.container(key="hero_box"):
     st.markdown(
         "".join([
+            '<div class="hero-top"><div class="hero-left">',
             '<div class="hero-title">👋 Merhaba Atlas</div>',
-            '<div class="hero-sub">Bugün seni yeni maceralar bekliyor. Her kitap yeni bir dünyadır. ✨</div>',
-            f'<div class="hero-xp"><b>⭐ Seviye {lvl["level"]}</b>{level_bar_html(lvl)}</div>',
+            f'<div class="hero-goalline"><span>🎯</span><div class="goal-slots">{slots}</div>',
+            f'<b>{min(gs["done"], gs["goal"])}/{gs["goal"]}</b>{streak_html}</div>',
+            f'<div class="goal-msg">{goal_msg}</div></div>',
+            f'<div class="hero-right"><b>⭐ Seviye {lvl["level"]}</b>{level_bar_html(lvl)}</div></div>',
         ]),
         unsafe_allow_html=True,
     )
-    hb1, hb2, _sp = st.columns([1, 1, 2])
+    # V0.9 CHANGE: hedef tamamlanınca günde bir kez balon kutlaması
+    if gs["done"] >= gs["goal"] and st.session_state.goal_celebrated != gs["today_iso"]:
+      st.session_state.goal_celebrated = gs["today_iso"]
+      st.balloons()
+    hb1, hb2, _sp = st.columns([1, 1, 3])
     hb1.button("🎡 Sihirli Çark", key="hero_wheel", on_click=spin_wheel, use_container_width=True)
     hb2.button("📚 Rastgele Öner", key="hero_random", on_click=random_pick, use_container_width=True)
 
@@ -599,12 +1047,12 @@ if active_page == "Ana Sayfa":
       ("🌟", "Tümü", "Tümü"), ("🐉", "Hikaye", "Hikaye"),
       ("🚀", "Bilgi", "Bilgi & Keşif"),
       ("💡", "İlk Okuma", "İlk Okuma"), ("🌍", "Doğa", "Doğa & Hayvanlar"),
-      ("🔬", "Bilim", "Bilim"),
+      ("🔬", "Bilim", "Bilim"), ("💛", "Değerler", "Değerler"),
   ]
-  cat_counts = books_df["category"].value_counts().to_dict()
+  cat_counts = eligible_df["category"].value_counts().to_dict()  # V0.9 CHANGE: okul kitapları sayılmaz
   cat_cols = st.columns(len(categories))
   for idx, (icon, label, actual) in enumerate(categories):
-    n = len(books_df) if actual == "Tümü" else cat_counts.get(actual, 0)
+    n = len(eligible_df) if actual == "Tümü" else cat_counts.get(actual, 0)
     is_on = active_cat_label == actual
     cat_cols[idx].button(
         f"{icon} **{label}**\n\n({n})",
@@ -620,24 +1068,15 @@ if active_page == "Ana Sayfa":
       + (f" ({active_cat_label})" if active_cat_label != "Tümü" else "")
   )
 
+  if st.session_state.featured_note:
+    st.caption(st.session_state.featured_note)
+
   featured_books = st.session_state.current_featured_books
   if not featured_books or len(featured_books) == 0:
-    default_pool = (
-        pool_df[pool_df["category"] == active_cat_label]
-        if active_cat_label != "Tümü"
-        else pool_df
-    )
-    n_default = 2 if len(featured_books) == 0 and len(default_pool) >= 2 else 4
-    if len(default_pool) >= n_default:
-      featured_books = default_pool.sample(n=n_default).to_dict(
-          orient="records"
-      )
-    elif len(default_pool) > 0:
-      featured_books = default_pool.to_dict(orient="records")
-    elif len(pool_df) > 0:
-      featured_books = pool_df.sample(
-          n=min(2, len(pool_df))
-      ).to_dict(orient="records")
+    # V0.9 CHANGE: ilk açılışta da önce okunmamış kitaplar, günlük hedef kadar
+    default_pool = get_unread_pool(active_cat_label)
+    if len(default_pool) > 0:
+      featured_books = sample_books(default_pool, min(gs["goal"], len(default_pool)))
     st.session_state.current_featured_books = featured_books
 
   if featured_books:
@@ -649,19 +1088,20 @@ if active_page == "Ana Sayfa":
 
   st.markdown("#### 📖 Son Maceraların")
   title_map = dict(zip(books_df["id"], books_df["title"]))
+  school_ids = set(books_df.loc[books_df["is_school"] == 1, "id"])  # V0.9 CHANGE
   recent, seen = [], set()
   for l in sorted(logs_data, key=lambda x: x.get("read_at") or "", reverse=True):
     bid = l.get("book_id")
     if bid in title_map and bid not in seen:
       seen.add(bid)
-      recent.append((title_map[bid], (l.get("read_at") or "")[:10]))
+      recent.append((title_map[bid], (l.get("read_at") or "")[:10], bid in school_ids))
     if len(recent) == 5:
       break
   if recent:
     st.markdown(
         "".join(
-            f'<div class="recent-item"><div>📖 <b>{html.escape(str(t))}</b></div><span>{d}</span></div>'
-            for t, d in recent
+            f'<div class="recent-item"><div>{"🏫" if sch else "📖"} <b>{html.escape(str(t))}</b></div><span>{d}</span></div>'
+            for t, d, sch in recent
         ),
         unsafe_allow_html=True,
     )
@@ -673,15 +1113,8 @@ if active_page == "Ana Sayfa":
 elif active_page == "Kütüphane":
   st.markdown("### 📖 Kütüphane Arşivi")
 
-  lib_tab_choice = st.radio(
-      "Koleksiyon Seçin",
-      ["🏡 Ev Kütüphanesi", "🏫 De Vuurvlinder Okul Kütüphanesi"],
-      horizontal=True,
-      label_visibility="collapsed",
-  )
-
-  is_school_view = "Okul" in lib_tab_choice
-  lib_base_df = books_df[books_df["is_school"] == (1 if is_school_view else 0)]
+  # V0.9 CHANGE: okul kitapları kütüphanede durmaz, sadece ev kitapları listelenir
+  lib_base_df = home_df
 
   all_publishers = sorted(
       {
@@ -691,7 +1124,7 @@ elif active_page == "Kütüphane":
       }
   )
 
-  col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
+  col_s1, col_s2, col_s3, col_s4 = st.columns([2, 1, 1, 1])
   with col_s1:
     search_query = st.text_input(
         "Kitap veya Yazar Ara",
@@ -703,15 +1136,7 @@ elif active_page == "Kütüphane":
         "Yayınevi Filtrele", ["Tümü"] + all_publishers, key="lib_pub_select"
     )
   with col_s3:
-    cat_options = [
-        "Tümü",
-        "Hikaye",
-        "Bilgi & Keşif",
-        "Aktivite",
-        "İlk Okuma",
-        "Doğa & Hayvanlar",
-        "Bilim",
-    ]
+    cat_options = ["Tümü"] + CATEGORIES  # V1.0 CHANGE
     default_cat_idx = (
         cat_options.index(st.session_state.selected_category)
         if st.session_state.selected_category in cat_options
@@ -719,6 +1144,11 @@ elif active_page == "Kütüphane":
     )
     cat_filter = st.selectbox(
         "Kategori Filtrele", cat_options, index=default_cat_idx, key="lib_cat"
+    )
+  with col_s4:
+    # V1.0 CHANGE: yaşı geçen kitaplar için filtre
+    age_filter = st.selectbox(
+        "Yaş Uygunluğu", ["Uygun olanlar", "Tümü", "Yaşı geçenler"], key="lib_age"
     )
 
   filtered_lib = lib_base_df.copy()
@@ -736,13 +1166,13 @@ elif active_page == "Kütüphane":
     ]
   if cat_filter != "Tümü":
     filtered_lib = filtered_lib[filtered_lib["category"] == cat_filter]
+  if age_filter == "Uygun olanlar":
+    filtered_lib = filtered_lib[filtered_lib["is_outgrown"] == 0]
+  elif age_filter == "Yaşı geçenler":
+    filtered_lib = filtered_lib[filtered_lib["is_outgrown"] == 1]
 
   filtered_lib = filtered_lib.sort_values(by="title", ascending=True)
-  st.write(
-      f"📚 Toplam **{len(filtered_lib)}** kitap listeleniyor ("
-      + ("Okul Kütüphanesi" if is_school_view else "Ev Kütüphanesi")
-      + ")."
-  )
+  st.write(f"📚 Toplam **{len(filtered_lib)}** kitap listeleniyor.")
 
   for start in range(0, len(filtered_lib), 4):
     cols = st.columns(4)
@@ -780,33 +1210,31 @@ elif active_page == "Okuma Yolculuğu":
     st.success("🪐 Tüm durakları tamamladın!")
   st.markdown("---")
 
-  total_books_count = len(books_df)
+  # V0.9 CHANGE: okul kitapları da "okunan"a dahil; yüzde sadece ev kütüphanesine göre
+  total_books_count = len(home_df)
   read_books_df = books_df[books_df["read_count"] > 0]
   total_read_count = len(read_books_df)
+  home_read_count = int((home_df["read_count"] > 0).sum())
+  school_read_count = total_read_count - home_read_count
 
-  total_pages_read = 0
-  for _, rbook in read_books_df.iterrows():
-    try:
-      p = int(rbook.get("pages", 0) or 0)
-      rc = int(rbook.get("read_count", 1) or 1)
-      total_pages_read += p * rc
-    except Exception:
-      pass
+  # V0.9 CHANGE: sayfa bilgisi olmayan kitaplar toplama katılmaz (varsayılan yok)
+  total_pages_read = int(
+      (read_books_df["pages"].fillna(0) * read_books_df["read_count"]).sum()
+  )
 
   col_m1, col_m2, col_m3 = st.columns(3)
   with col_m1:
     st.metric(
         label="Toplam Okunan Kitap",
-        value=f"{total_read_count} / {total_books_count}",
+        value=f"{total_read_count}",
     )
-    st.progress(
-        total_read_count / max(total_books_count, 1),
-        text=f"%{round((total_read_count / max(total_books_count, 1)) * 100, 1)}",
-    )
+    st.caption(f"🏡 {home_read_count} ev · 🏫 {school_read_count} okul")
+    home_pct = home_read_count / max(total_books_count, 1)
+    st.progress(home_pct, text=f"Ev kütüphanesi %{round(home_pct * 100, 1)}")
   with col_m2:
     st.metric(label="Toplam Okunan Sayfa", value=f"{total_pages_read} Sayfa 📄")
   with col_m3:
-    stories = books_df[books_df["category"] == "Hikaye"]
+    stories = home_df[home_df["category"] == "Hikaye"]
     story_done = len(stories[stories["read_count"] > 0])
     st.metric(
         label="Tamamlanan Hikâyeler", value=f"{story_done} / {len(stories)}"
@@ -816,11 +1244,22 @@ elif active_page == "Okuma Yolculuğu":
         text=f"%{round((story_done / max(len(stories), 1)) * 100, 1)}",
     )
 
+  # V0.9 CHANGE: Türkçe / Dutch okuma özeti
+  st.markdown("---")
+  st.markdown("#### 🌍 Hangi Dilde Okudum?")
+  lang_sum = language_read_summary(logs_data, books_df)
+  lang_cols = st.columns(3 if "Diğer" in lang_sum else 2)
+  lang_cols[0].markdown(lang_card_html("🇹🇷 Türkçe", lang_sum.get("Türkçe")), unsafe_allow_html=True)
+  lang_cols[1].markdown(lang_card_html("🇳🇱 Dutch", lang_sum.get("Dutch")), unsafe_allow_html=True)
+  if "Diğer" in lang_sum:
+    lang_cols[2].markdown(lang_card_html("🌍 Diğer", lang_sum["Diğer"]), unsafe_allow_html=True)
+  st.caption("Her okuma kaydı bir kez sayılır (aynı kitabı tekrar okumak da dahil).")
+
   st.markdown("---")
   st.markdown("#### 📊 Kategoriye Göre Okuma Dağılımı")
 
   cat_groups = (
-      books_df.groupby("category")
+      home_df.groupby("category")
       .agg(Toplam=("id", "count"), Okunan=("read_count", lambda x: (x > 0).sum()))
       .reset_index()
   )
@@ -928,15 +1367,32 @@ elif active_page == "Yönetici Paneli":
       st.rerun()
 
     missing_n = int((books_df["cover_url"].isna() | (books_df["cover_url"] == "")).sum())
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Toplam Kitap", total_books)
     k2.metric("Okuma Kaydı", len(logs_data))
     k3.metric("Bu Ay", month_read_count)
-    k4.metric("Kapağı Eksik", missing_n)
+    k4.metric("Onay Bekleyen", len(pending_logs))  # V0.9 CHANGE
+    k5.metric("Kapağı Eksik", missing_n)
+
+    # V0.9 CHANGE: günlük hedef ayarı
+    with st.expander("🎯 Günlük hedef ayarı"):
+      goal_input = st.number_input(
+          "Günde kaç kitap?",
+          min_value=1,
+          max_value=10,
+          value=daily_goal(),
+          step=1,
+          key="goal_input",
+      )
+      if st.button("Hedefi Kaydet", key="save_goal"):
+        set_setting("daily_goal", int(goal_input))
+        st.toast(f"Günlük hedef {int(goal_input)} kitap olarak kaydedildi.", icon="🎯")
+        st.rerun()
 
     st.markdown("---")
 
     (
+        adm_tab_pending,
         adm_tab_school,
         adm_tab1,
         adm_tab2,
@@ -948,7 +1404,10 @@ elif active_page == "Yönetici Paneli":
         adm_tab7,
         adm_tab8,
         adm_tab_delete,
+        adm_tab_outgrown,
+        adm_tab_catreview,
     ) = st.tabs([
+        f"⏳ Onay Bekleyenler ({len(pending_logs)})",  # V0.9 CHANGE
         "🏫 Okul Kitabı Ekle",
         "➕ Yeni Kitap",
         "✏️ Düzenle",
@@ -960,19 +1419,58 @@ elif active_page == "Yönetici Paneli":
         "🧹 Sıfırla",
         "💾 DB Yedek",
         "🗑️ Kitap Sil",
+        "🎒 Yaşı Geçti",
+        "🔎 Kategori İncelemesi",
     ])
+
+    # V0.9 CHANGE: çocuğun "Okudum" dediği kayıtlar burada onaylanır / reddedilir
+    with adm_tab_pending:
+      st.subheader("⏳ Onay Bekleyen Okumalar")
+      if not pending_logs:
+        st.success("Bekleyen okuma yok 🎉")
+      else:
+        if st.button("✅ Hepsini Onayla", key="approve_all", use_container_width=True):
+          for pl in pending_logs:
+            approve_reading(pl["id"])
+          st.toast(f"{len(pending_logs)} okuma onaylandı.", icon="✅")
+          st.rerun()
+        pend_titles = dict(zip(books_df["id"], books_df["title"]))
+        for pl in sorted(pending_logs, key=lambda x: x.get("read_at") or ""):
+          pc1, pc2, pc3 = st.columns([5, 1.3, 1.3])
+          pc1.write(
+              f"📖 **{pend_titles.get(pl['book_id'], '(silinmiş kitap)')}** —"
+              f" {(pl.get('read_at') or '')[:16].replace('T', ' ')}"
+          )
+          if pc2.button("✅ Onayla", key=f"approve_{pl['id']}"):
+            approve_reading(pl["id"])
+            st.rerun()
+          if pc3.button("✖ Reddet", key=f"reject_{pl['id']}"):
+            reject_reading(pl["id"])
+            st.rerun()
 
     with adm_tab_school:
       st.subheader("🏫 De Vuurvlinder Okul Kitabı Ekle")
       st.markdown("İstersen **ISBN Numarası** girerek detayları otomatik buldurabilir, istersen sadece **Kitap Adı** yazarak ekleyebilirsin.")
-      
+      # V0.9 CHANGE: okul kitabı kütüphanede durmaz; eklenince okunmuş (Dutch) olarak sayılır
+      st.caption("Okul kitapları kütüphanede listelenmez. Eklediğin an Dutch olarak okunmuş sayılır (aylık/yıllık istatistik, XP ve rozetler).")
+
       with st.form("admin_school_quick_form"):
         sch_isbn = st.text_input("ISBN Numarası (Otomatik bulma için)", placeholder="Örn: 97890258... (İsteğe bağlı)")
         quick_title = st.text_input("Kitap Adı (ISBN boşsa zorunlu)", placeholder="Örn: Nijntje op school")
-        quick_pages = st.number_input("Sayfa Sayısı", min_value=8, max_value=200, value=28)
-        
+        # V0.9 CHANGE: sayfa sayısı varsayılan değersiz, boş bırakılabilir
+        quick_pages = st.number_input(
+            "Sayfa Sayısı (biliniyorsa)",
+            min_value=1,
+            max_value=500,
+            value=None,
+            step=1,
+            placeholder="Boş bırakılabilir",
+        )
+        sch_date = st.date_input("Okunduğu Tarih", value=datetime.now(TZ).date())
+        sch_time = st.time_input("Okunduğu Saat", value=datetime.now(TZ).time())
+
         if st.form_submit_button("Okul Kitabını Ekle"):
-          final_title = quick_title
+          final_title = quick_title.strip()
           final_author = "De Vuurvlinder Okulu"
           final_publisher = "De Vuurvlinder"
           final_pages = quick_pages
@@ -995,25 +1493,42 @@ elif active_page == "Yönetici Paneli":
                 st.warning("ISBN ile eşleşen kitap bulunamadı, girdiğiniz isimle kaydediliyor.")
 
           if final_title:
-            bid = "SCH-" + uuid.uuid4().hex[:8].upper()
+            read_iso = datetime.combine(sch_date, sch_time).isoformat()
             con = sqlite3.connect(DB_NAME)
+            # V0.9 CHANGE: aynı okul kitabı daha önce eklendiyse yeni kitap açma, okuma sayısını artır
+            existing = con.execute(
+                "SELECT id FROM books WHERE is_school = 1 AND lower(title) = lower(?)",
+                (final_title,),
+            ).fetchone()
+            if existing:
+              bid = existing[0]
+              con.execute(
+                  "UPDATE books SET read_count = read_count + 1 WHERE id = ?", (bid,)
+              )
+            else:
+              bid = "SCH-" + uuid.uuid4().hex[:8].upper()
+              con.execute(
+                  "INSERT INTO books (id, title, author, publisher, isbn, category, pages, cover_url, language, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Dutch', 1, ?, 1)",
+                  (
+                      bid,
+                      final_title,
+                      final_author,
+                      final_publisher,
+                      final_isbn,
+                      "Hikaye",
+                      int(final_pages) if final_pages else None,
+                      final_cover,
+                      datetime.now(TZ).isoformat(),
+                  ),
+              )
+            # V0.9 CHANGE: okuma kaydı da hemen oluşturulur -> aylık/yıllık sayıma girer
             con.execute(
-                "INSERT INTO books (id, title, author, publisher, isbn, category, pages, cover_url, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 1)",
-                (
-                    bid,
-                    final_title,
-                    final_author,
-                    final_publisher,
-                    final_isbn,
-                    "Hikaye",
-                    final_pages,
-                    final_cover,
-                    datetime.now(TZ).isoformat(),
-                ),
+                "INSERT INTO reading_log (book_id, status, read_at, cycle) VALUES (?, 'read', ?, 1)",
+                (bid, read_iso),
             )
             con.commit()
             con.close()
-            st.success(f"'{final_title}' okul kütüphanesine başarıyla eklendi! 🎒")
+            st.toast(f"'{final_title}' okunmuş olarak kaydedildi! 🎒", icon="✅")
             st.rerun()
           else:
             st.error("Lütfen en azından kitap adını girin.")
@@ -1025,19 +1540,12 @@ elif active_page == "Yönetici Paneli":
         new_a = st.text_input("Yazar")
         new_p = st.text_input("Yayınevi")
         new_isbn = st.text_input("ISBN Numarası")
-        new_c = st.selectbox(
-            "Kategori",
-            [
-                "Hikaye",
-                "Bilgi & Keşif",
-                "Aktivite",
-                "İlk Okuma",
-                "Doğa & Hayvanlar",
-                "Bilim",
-            ],
-        )
+        new_c = st.selectbox("Kategori", CATEGORIES)  # V1.0 CHANGE
         new_ag = st.text_input("Yaş Grubu", "5+")
-        new_pg = st.number_input("Sayfa Sayısı", min_value=1, value=32)
+        # V0.9 CHANGE: varsayılan sayfa sayısı kaldırıldı, boş bırakılabilir
+        new_pg = st.number_input(
+            "Sayfa Sayısı", min_value=1, value=None, step=1, placeholder="Boş bırakılabilir"
+        )
         new_lang = st.text_input("Kitap Dili", "Türkçe")
         new_cv = st.text_input("Kapak Görsel URL")
 
@@ -1055,7 +1563,7 @@ elif active_page == "Yönetici Paneli":
                     new_isbn,
                     new_c,
                     new_ag,
-                    new_pg,
+                    int(new_pg) if new_pg else None,  # V0.9 CHANGE
                     new_lang,
                     new_cv,
                     datetime.now(TZ).isoformat(),
@@ -1093,17 +1601,36 @@ elif active_page == "Yönetici Paneli":
             up_pub = st.text_input(
                 "Yayınevi", value=str(eb.get("publisher", ""))
             )
+            # V0.9 CHANGE: bilgi yoksa 24 yazma, boş göster
             up_pages = st.number_input(
-                "Sayfa Sayısı", value=int(eb.get("pages", 24) or 24)
+                "Sayfa Sayısı",
+                min_value=1,
+                step=1,
+                value=int(eb["pages"]) if pd.notna(eb.get("pages")) else None,
+                placeholder="Bilinmiyor",
+                key=f"up_pages_{eb['id']}",
             )
             up_lang = st.text_input(
                 "Dil", value=str(eb.get("language", "Türkçe"))
             )
+            # V1.0 CHANGE: kategori düzenleme ve "yaşı geçti" işareti
+            cur_cat = eb.get("category")
+            cat_choices = CATEGORIES if cur_cat in CATEGORIES else [cur_cat] + CATEGORIES
+            up_cat = st.selectbox(
+                "Kategori", cat_choices,
+                index=cat_choices.index(cur_cat) if cur_cat in cat_choices else 0,
+                key=f"up_cat_{eb['id']}",
+            )
+            up_out = st.checkbox(
+                "🎒 Yaşı geçti (öneri listelerine hiç girmesin)",
+                value=bool(int(eb.get("is_outgrown", 0))),
+                key=f"up_out_{eb['id']}",
+            )
             if st.form_submit_button("Güncelle"):
               con = sqlite3.connect(DB_NAME)
               con.execute(
-                  "UPDATE books SET title = ?, author = ?, publisher = ?, pages = ?, language = ? WHERE id = ?",
-                  (up_title, up_author, up_pub, up_pages, up_lang, eb["id"]),
+                  "UPDATE books SET title = ?, author = ?, publisher = ?, pages = ?, language = ?, category = ?, is_outgrown = ? WHERE id = ?",
+                  (up_title, up_author, up_pub, int(up_pages) if up_pages else None, up_lang, up_cat, int(up_out), eb["id"]),
               )
               con.commit()
               con.close()
@@ -1190,8 +1717,9 @@ elif active_page == "Yönetici Paneli":
           if st.button("Geri Al", key=f"undo_{rb['id']}"):
             con = sqlite3.connect(DB_NAME)
             last_log = con.execute(
-                "SELECT id FROM reading_log WHERE book_id = ? ORDER BY read_at"
-                " DESC LIMIT 1",
+                # V0.9 CHANGE: geri al, onay bekleyen kaydı değil onaylı son kaydı siler
+                "SELECT id FROM reading_log WHERE book_id = ? AND COALESCE(status, '') != 'pending'"
+                " ORDER BY read_at DESC LIMIT 1",
                 (rb["id"],),
             ).fetchone()
             if last_log:
@@ -1208,7 +1736,7 @@ elif active_page == "Yönetici Paneli":
 
     with adm_tab5:
       st.subheader("📊 Okuma Geçmişi Özeti")
-      logs_list = rows("reading_log")
+      logs_list = approved_logs(rows("reading_log"))  # V0.9 CHANGE: sadece onaylı okumalar
       if logs_list:
         summary_map = {}
         for l in logs_list:
@@ -1260,6 +1788,163 @@ elif active_page == "Yönetici Paneli":
               mime="application/x-sqlite3",
               use_container_width=True,
           )
+
+      # V0.9 CHANGE: indirilen yedeği geri yükleme
+      st.markdown("---")
+      st.subheader("♻️ Veritabanını Geri Yükle")
+      st.warning(
+          "Yüklenen yedek, şu anki tüm verinin (kitaplar ve okuma geçmişi) yerine geçer."
+          " İşlemden önce mevcut veritabanının bir kopyası otomatik alınır."
+      )
+      restore_file = st.file_uploader(
+          "Yedek dosyası (atlas_library.db)",
+          type=["db", "sqlite", "sqlite3"],
+          key="restore_upload",
+      )
+      if restore_file is not None:
+        restore_bytes = restore_file.getvalue()
+        new_info, restore_err = inspect_backup(restore_bytes)
+        if restore_err:
+          st.error(restore_err)
+        else:
+          cur_info = summarize_db(DB_NAME) or {"books": 0, "logs": 0, "pending": 0}
+          rc1, rc2 = st.columns(2)
+          rc1.metric(
+              "Şu anki veritabanı",
+              f"{cur_info['books']} kitap",
+              f"{cur_info['logs']} okuma kaydı",
+              delta_color="off",
+          )
+          rc2.metric(
+              "Yüklenen yedek",
+              f"{new_info['books']} kitap",
+              f"{new_info['logs']} okuma kaydı",
+              delta_color="off",
+          )
+          if new_info["logs"] < cur_info["logs"]:
+            st.warning(
+                f"Dikkat: yüklenen yedekte şu anki veritabanından {cur_info['logs'] - new_info['logs']}"
+                " okuma kaydı daha az. Yanlış dosyayı seçmediğinden emin ol."
+            )
+          restore_ok = st.checkbox(
+              "Mevcut veriyi bu yedekle değiştirmeyi onaylıyorum.", key="restore_confirm"
+          )
+          if st.button(
+              "♻️ Geri Yükle",
+              key="restore_btn",
+              disabled=not restore_ok,
+              use_container_width=True,
+          ):
+            restore_db(restore_bytes)
+            st.toast("Veritabanı geri yüklendi.", icon="✅")
+            st.rerun()
+
+    # V1.0 CHANGE: yaşı geçen kitapları işaretle (arama + filtre + tıkla-işaretle tablo)
+    with adm_tab_outgrown:
+      st.subheader("🎒 Yaşı Geçen Kitaplar")
+      st.caption(
+          "Kitabı bulun, 'Yaşı geçti' kutusunu işaretleyin, Kaydet'e basın. "
+          "İşaretli kitaplar öneri listelerine hiç girmez; kütüphanede 🎒 etiketiyle kalır, "
+          "geçmiş istatistikler korunur. Sadece tabloda görünen kitaplar değişir."
+      )
+      og_n = int((home_df["is_outgrown"] == 1).sum())
+      st.info(f"Şu an yaşı geçen: **{og_n}** kitap  ·  Öneri havuzu: **{len(eligible_df)}** kitap")
+
+      f1, f2, f3 = st.columns([2, 1, 1])
+      og_q = f1.text_input("🔍 Kitap ara", key="og_search", placeholder="Kitap adı...")
+      og_age_opts = ["Tümü"] + sorted(
+          {str(a) for a in home_df["age"].dropna() if str(a).strip()}
+      )
+      og_age = f2.selectbox("Yaş grubu", og_age_opts, key="og_age")
+      og_view = f3.selectbox(
+          "Göster", ["Hepsi", "Sadece işaretliler", "Sadece işaretsizler"], key="og_view"
+      )
+
+      og_df = home_df.copy()
+      if og_q.strip():
+        og_df = og_df[og_df["title"].astype(str).str.contains(og_q.strip(), case=False, na=False)]
+      if og_age != "Tümü":
+        og_df = og_df[og_df["age"].astype(str) == og_age]
+      if og_view == "Sadece işaretliler":
+        og_df = og_df[og_df["is_outgrown"] == 1]
+      elif og_view == "Sadece işaretsizler":
+        og_df = og_df[og_df["is_outgrown"] == 0]
+      og_df = og_df.sort_values("title")
+
+      table = pd.DataFrame({
+          "ID": og_df["id"].values,
+          "Kitap": og_df["title"].values,
+          "Yaş": og_df["age"].astype(str).values,
+          "Kategori": og_df["category"].values,
+          "🎒 Yaşı geçti": og_df["is_outgrown"].astype(bool).values,
+      })
+      st.write(f"**{len(table)}** kitap gösteriliyor.")
+      edited = st.data_editor(
+          table,
+          hide_index=True,
+          use_container_width=True,
+          disabled=["ID", "Kitap", "Yaş", "Kategori"],
+          column_config={"ID": None},
+          key=f"og_editor_{og_q}_{og_age}_{og_view}",
+      )
+      changed = edited[edited["🎒 Yaşı geçti"] != table["🎒 Yaşı geçti"]]
+      if len(changed) > 0:
+        st.warning(f"{len(changed)} kitapta değişiklik var; kaydedilmedi.")
+      if st.button("💾 Değişiklikleri Kaydet", key="outgrown_save", disabled=len(changed) == 0):
+        con = sqlite3.connect(DB_NAME)
+        con.executemany(
+            "UPDATE books SET is_outgrown = ? WHERE id = ?",
+            [(int(r["🎒 Yaşı geçti"]), r["ID"]) for _, r in changed.iterrows()],
+        )
+        con.commit()
+        con.close()
+        st.success(f"{len(changed)} kitap güncellendi.")
+        st.rerun()
+
+    # V1.0 CHANGE: internet araştırmasına dayalı kategori önerilerini önizle ve onayla
+    with adm_tab_catreview:
+      st.subheader("🔎 Kategori İncelemesi")
+      st.caption(
+          "Kitap adları internette araştırılarak hazırlanan yeni kategori önerileri. "
+          "Önce önizleyin, sonra isterseniz uygulayın. Uygulamadan önce DB yedeği alınır."
+      )
+      cur_cats = dict(zip(books_df["id"], books_df["category"]))
+      title_of = dict(zip(books_df["id"], books_df["title"]))
+      diff_rows = [
+          {"ID": k, "Kitap": title_of.get(k, "?"), "Şimdi": cur_cats.get(k),
+           "Önerilen": v[0], "Gerekçe": v[1], "Güven": v[2]}
+          for k, v in CATEGORY_REVIEW.items()
+          if k in cur_cats and cur_cats[k] != v[0]
+      ]
+      if not diff_rows:
+        st.success("✅ Tüm kategoriler inceleme önerileriyle uyumlu.")
+      else:
+        diff_df = pd.DataFrame(diff_rows)
+        st.write(f"**{len(diff_df)}** kitapta değişiklik öneriliyor.")
+        only_conf = st.checkbox("Sadece 'yüksek' güvenli önerileri uygula", value=False, key="catrev_hi")
+        view = diff_df[diff_df["Güven"] == "yüksek"] if only_conf else diff_df
+        st.dataframe(view, use_container_width=True, hide_index=True)
+        ok_apply = st.checkbox("Önizlemeyi inceledim, uygulansın", key="catrev_ok")
+        if st.button("✅ Kategorileri Uygula", key="catrev_apply", disabled=not ok_apply):
+          try:
+            DATA_DIR = BASE / "data"
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            src = sqlite3.connect(DB_NAME)
+            dst = sqlite3.connect(DATA_DIR / "pre_category_review.db")
+            src.backup(dst)
+            dst.close()
+            src.close()
+          except Exception:
+            pass
+          con = sqlite3.connect(DB_NAME)
+          con.executemany(
+              "UPDATE books SET category = ? WHERE id = ?",
+              [(r["Önerilen"], r["ID"]) for _, r in view.iterrows()],
+          )
+          con.commit()
+          con.close()
+          st.success(f"{len(view)} kitabın kategorisi güncellendi.")
+          st.rerun()
 
     with adm_tab_delete:
       st.subheader("🗑️ Kütüphaneden Kitap Sil")

@@ -1,0 +1,105 @@
+id,title,old_category,new_category,reason,confidence
+BÇ-1,Almanca İlk Bin Sözcük,Hikaye,Bilgi & Keşif,Resimli sözlük / dil kitabı,yüksek
+BÇ-3,Büyük Bilim İnsanı Galileo,Bilim,Bilgi & Keşif,Biyografi (Galileo),yüksek
+BÇ-4,Denizler Altında Yirmi Bin Fersah,Doğa & Hayvanlar,Hikaye,"Jules Verne uyarlaması, kurgu",yüksek
+BÇ-5,Gauguin Arkadaşım Paul,Değerler,Bilgi & Keşif,Ressam tanıtım serisi (sanat bilgisi),yüksek
+BÇ-6,İlk Satranç Kitabım,Hikaye,Aktivite,Satranç öğreten etkileşimli kitap,yüksek
+BÇ-9,Minik Ayıcıklar Alışverişe Gidiyor,Doğa & Hayvanlar,Hikaye,Minik Ayıcıklar: hayvan karakterli kurgu hikâye,yüksek
+BÇ-10,Minik Ayıcıklar için Uyku Vakti,Değerler,Hikaye,Minik Ayıcıklar: hayvan karakterli kurgu hikâye,yüksek
+BÇ-11,Minik Ayıcıklar Okula Gidiyor,Değerler,Hikaye,Minik Ayıcıklar: hayvan karakterli kurgu hikâye,yüksek
+BÇ-12,Minik Ayıcıklar Pikniğe Gidiyor,Doğa & Hayvanlar,Hikaye,Minik Ayıcıklar: hayvan karakterli kurgu hikâye,yüksek
+BÇ-13,Monet Arkadaşım Claude,Değerler,Bilgi & Keşif,Ressam tanıtım serisi (sanat bilgisi),yüksek
+BÇ-17,Van Gogh Arkadaşım Vincent,Değerler,Bilgi & Keşif,Ressam tanıtım serisi (sanat bilgisi),yüksek
+BÇ-18,Yemek Vakti,Hikaye,Değerler,Günlük alışkanlık / beslenme teması,yüksek
+ABM-7,En Güzel Tüyünü Kaybeden Kuş,Doğa & Hayvanlar,Hikaye,Kurgu hikâye (kuş karakteri),orta
+ABM-8,Elo ve Moni ile Finansal Okuryazarlık,Hikaye,Bilgi & Keşif,Finansal okuryazarlık bilgi kitabı,yüksek
+ABM-15,Karnımız Zil Çalıyor,Hikaye,Değerler,Yemek/günlük yaşam alışkanlığı,orta
+ABM-22,Rengârenk Düğmeler,Hikaye,Aktivite,Düğmeli etkileşimli aktivite kitabı (kitapyurdu yorumları),yüksek
+ABM-27,Yoga Zamanı!,Hikaye,Aktivite,"Yoga hareketleri, etkinlik",yüksek
+AK-1,Hayvanlar Senfonisi,Doğa & Hayvanlar,Hikaye,Hayvan karakterli kurgu hikâye,yüksek
+AK-2,Kayıp Köpek Üzüm,Doğa & Hayvanlar,Hikaye,Hayvan karakterli kurgu hikâye,yüksek
+AK-4,Minik Puck,İlk Okuma,Hikaye,İlk Okuma yalnızca Cin Ali serisi; kitap doğrulanamadı,düşük
+AK-5,Nokta,Hikaye,Değerler,Peter H. Reynolds: yaratıcılık/cesaret teması,yüksek
+AR-1,Dünyanın En Güzel Hayvan Masalları,Bilim,Hikaye,Masal derlemesi,yüksek
+BY-1,Teo’nun Kaka Kitabı,Hikaye,Değerler,"Tuvalet alışkanlığı, günlük yaşam",yüksek
+BTK-1,Sihirli Kumbara,Hikaye,Bilgi & Keşif,Finansal okuryazarlık,yüksek
+BTK-2,Sihirli Limonata,Hikaye,Bilgi & Keşif,Finansal okuryazarlık,yüksek
+CÇ-1,Puhu Kuşu Kasabası,Doğa & Hayvanlar,Hikaye,Hayvan karakterli kurgu hikâye,yüksek
+DK-7,Bay Mutlu,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-8,Bay Neşeli,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-10,Bay Sakin,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-21,Küçük Bayan Mucit,Bilim,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-23,Küçük Bayan Şanslı,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-24,Küçük Bayan Yardımsever,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DK-26,Küçük Bay ve Bayanlar Okula Gidiyor,Değerler,Hikaye,Mr. Men / Little Miss serisi: karakter hikâyesi,yüksek
+DO-1,Antarktika Hariç!,Doğa & Hayvanlar,Hikaye,Hayvanlı mizahi resimli kitap (kitapyurdu),yüksek
+DO-3,Atlas: Kıtalar-Denizler-Kültürler Arası Yolculuk Rehberi,Doğa & Hayvanlar,Bilgi & Keşif,Atlas: coğrafya / kültür,yüksek
+DO-5,Dâhiler Sınıfı: Arşimet - Sayıların Büyücüsü,Bilim,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-6,Dâhiler Sınıfı: Einstein - Sınırsız Deha,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-7,Dahiler Sınıfı: Enzo Ferrari,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-8,Dahiler Sınıfı: Leonardo da Vinci,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-9,Dahiler Sınıfı: Marie Curie,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-10,Dahiler Sınıfı: Mozart,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-11,Dahiler Sınıfı: Tesla,Hikaye,Bilgi & Keşif,Dahiler Sınıfı: biyografi serisi (internetten doğrulandı),yüksek
+DO-13,Futbolcu Ne Yapar?,Hikaye,Bilgi & Keşif,Meslek tanıtımı,yüksek
+DO-28,Yer Altı ve Su Altı,Hikaye,Bilgi & Keşif,Genel bilgi (yer altı / su altı),orta
+HK-1,Brokoli’nin Büyük Günü,Doğa & Hayvanlar,Hikaye,Kurgu hikâye,orta
+KKÇ-3,Mustafa Kemal Atatürk ve Doğa,Doğa & Hayvanlar,Bilgi & Keşif,Atatürk serisi: tarih / bilgi,yüksek
+KKÇ-4,Mustafa Kemal Atatürk ve Hayvan Sevgisi,Değerler,Bilgi & Keşif,Atatürk serisi: tarih / bilgi,yüksek
+NC-1,100 First Words Nature,Hikaye,Doğa & Hayvanlar,Doğa temalı resimli sözlük,yüksek
+RH-1,Ahtapot ile Sessiz Balina,Doğa & Hayvanlar,Hikaye,Resimli hikâye (başlıktan; doğrulanamadı),orta
+RH-9,İşte Benim Bir Günüm,Hikaye,Bilgi & Keşif,Genel bilgi,orta
+RH-10,Kâğıttan Şehir,Bilgi & Keşif,Hikaye,"Sessiz kitap, kurgu (kitapyurdu: Hikâye)",yüksek
+RH-11,Kirpi ve Sergi,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-12,Kurbağaya Özenen Tavşan Roka,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-13,"Küçük Bir Nokta, Büyük Bir Fil",Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-15,Postacı Fare’nin Bir Günü,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-16,Postacı Fare’nin Olağanüstü Yolculukları,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-17,Postacı Fare Tatilde,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-18,Sadece Üçe Kadar Sayabilen Adam,Bilim,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-19,Sen Bir Robot Değilsin,Bilim,Değerler,Sorumluluk temalı bahar öyküsü (kitapyurdu),yüksek
+RH-24,Yako’nun Bahçesi,Doğa & Hayvanlar,Hikaye,Hayvan/insan karakterli kurgu hikâye,orta
+RH-25,Yalnız Balina,Değerler,Hikaye,Resimli hikâye (kitapyurdu: Hikâye),yüksek
+STU-1,Mijn Mega Groot Zoek Boek,Hikaye,Aktivite,Ara-bul (zoek boek) etkinlik kitabı,yüksek
+TB-2,Ateş Böceği,Hikaye,Doğa & Hayvanlar,TÜBİTAK doğa resimli kitabı; doğrulanamadı,düşük
+TB-7,Bir Dağı Nasıl Oluşturursun? - 9 Basit Adım ve 100 Milyon Yıl Yeter!,Bilgi & Keşif,Bilim,Dağların oluşumu: jeoloji bilgisi,orta
+TB-14,Gece Vakti,Hikaye,Doğa & Hayvanlar,Gece hayvanları: bilgilendirici (kitapyurdu),yüksek
+TB-18,İmparatorun Yumurtası,Hikaye,Doğa & Hayvanlar,İmparator penguen yumurtası: doğa,orta
+TB-23,Kuzey Kutbu,Hikaye,Doğa & Hayvanlar,Kuzey Kutbu: bilgilendirici doğa kitabı (kitapyurdu),yüksek
+TİB-3,Çevremizdeki Dünya: Orman,Bilim,Doğa & Hayvanlar,Orman: doğa bilgisi,yüksek
+TİB-4,Dedektif Zebra ve Kayıp Kurabiyelerin Gizemi,Doğa & Hayvanlar,Hikaye,Hayvan karakterli kurgu hikâye,yüksek
+TİB-5,Dünya’da Neler Var?,Bilim,Bilgi & Keşif,Genel bilgi,yüksek
+TİB-7,Dünyayı Öğreniyorum: Arkadaşım Arıcı,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-8,Dünyayı Öğreniyorum: Arkadaşım Astronot,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-9,Dünyayı Öğreniyorum: Arkadaşım Bahçeci,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-10,Dünyayı Öğreniyorum: Arkadaşım Balerin,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-11,Dünyayı Öğreniyorum: Arkadaşım Çiftçi,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-12,Dünyayı Öğreniyorum: Arkadaşım Dişçi,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-13,Dünyayı Öğreniyorum: Arkadaşım Fırıncı,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-14,Dünyayı Öğreniyorum: Arkadaşım Futbolcu,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-15,Dünyayı Öğreniyorum: Arkadaşım Hemşire,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-16,Dünyayı Öğreniyorum: Arkadaşım İnşaat Ustası,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-17,Dünyayı Öğreniyorum: Arkadaşım Kamyon Şöförü,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-18,Dünyayı Öğreniyorum: Arkadaşım Kaptan,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-19,Dünyayı Öğreniyorum: Arkadaşım Makinist,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-20,Dünyayı Öğreniyorum: Arkadaşım Otobüs Şöförü,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-21,Dünyayı Öğreniyorum: Arkadaşım Öğretmen,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-22,Dünyayı Öğreniyorum: Arkadaşım Pilot,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-23,Dünyayı Öğreniyorum: Arkadaşım Postacı,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-24,Dünyayı Öğreniyorum: Arkadaşım Yarışçı,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-25,Dünyayı Öğreniyorum: Arkdaşım Opera Sanatçısı,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-26,Dünyayı Öğreniyorum: Arkdaşım Temizlik İşçisi,Bilim,Bilgi & Keşif,Meslek tanıtım serisi,yüksek
+TİB-29,Dünyayı Öğreniyorum: Dağları Keşfet,Bilim,Doğa & Hayvanlar,Doğa / hayvan bilgisi,yüksek
+TİB-30,Dünyayı Öğreniyorum: Denizi Keşfet,Bilim,Doğa & Hayvanlar,Doğa / hayvan bilgisi,yüksek
+TİB-32,Dünyayı Öğreniyorum: Evimizde,Bilim,Bilgi & Keşif,Günlük yaşam / uygarlık bilgisi,yüksek
+TİB-37,Dünyayı Öğreniyorum: Mö Sesi Nereden Geliyor?,Bilim,Doğa & Hayvanlar,Doğa / hayvan bilgisi,yüksek
+TİB-38,Dünyayı Öğreniyorum: Ormanı Keşfet,Bilim,Doğa & Hayvanlar,Doğa / hayvan bilgisi,yüksek
+TİB-42,Dünyayı Öğreniyorum: Uygarlık Macerası,Bilim,Bilgi & Keşif,Günlük yaşam / uygarlık bilgisi,yüksek
+TİB-48,Hayvanat Bahçesinde Diş Fırçalama Günü,Doğa & Hayvanlar,Değerler,Diş fırçalama alışkanlığı,yüksek
+TİB-58,İlk Okuma Kitabım: Elif Denizde,Doğa & Hayvanlar,Hikaye,İlk Okuma Kitabım serisi tek tipte Hikaye,orta
+TİB-60,İlk Okuma Kitabım: Elif’e Kardeş Geliyor,Değerler,Hikaye,İlk Okuma Kitabım serisi tek tipte Hikaye,orta
+TİB-68,Kimin Burnu? Kimin Bunlar?,Hikaye,Doğa & Hayvanlar,Hayvan tanıtım kitabı,yüksek
+TİB-73,Yavru Timsah Çipiti,Doğa & Hayvanlar,Hikaye,Hayvan karakterli kurgu hikâye,orta
+YKY-1,Büyük Sorular Kitabım,Hikaye,Bilgi & Keşif,Genel bilgi (Büyük Sorular),yüksek
+YKY-3,Uğurböceği Sevecen ile Salyangoz Tomurcuk 8: Uzay Yolculuğu,Bilim,Doğa & Hayvanlar,Böcek/doğa teması,orta
+YKY-7,Zamanda Yolculuğa Çıkan Kurt,Bilgi & Keşif,Hikaye,Kurgu hikâye,orta
