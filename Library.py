@@ -18,7 +18,7 @@ BASE = Path(__file__).parent
 SEED = BASE / "data" / "books.csv"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# --- CSS STİLLERİ (v0.6.6 - Parantezli Sayı Düzeni) ---
+# --- CSS STİLLERİ ---
 st.markdown(
     """
 <style>
@@ -58,7 +58,7 @@ section[data-testid="stSidebar"] div.stButton>button:hover{border-color:var(--pr
 .hero-xp .xp-fill{background:#fff;}
 .st-key-hero_box div.stButton>button{background:#fff;color:#4F7CFF!important;box-shadow:none;}
 
-/* XP bar (shared) */
+/* XP bar */
 .xp-track{background:#e2e8f0;border-radius:99px;height:12px;overflow:hidden;margin:6px 0 4px;}
 .xp-fill{background:linear-gradient(90deg,#4F7CFF,#7C4DFF);height:100%;border-radius:99px;}
 .xp-text{font-size:.8rem;font-weight:600;}
@@ -76,6 +76,8 @@ div[class*="st-key-catON_"] button{border:2px solid #4F7CFF;}
 .book-cover img{height:100%;max-width:100%;object-fit:contain;}
 .book-badge{position:absolute;top:18px;left:18px;background:#fff;border-radius:99px;padding:3px 10px;
   font-size:.72rem;font-weight:800;color:#7C4DFF;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.school-badge{position:absolute;top:18px;right:18px;background:#FEF3C7;border-radius:99px;padding:3px 10px;
+  font-size:.7rem;font-weight:800;color:#D97706;box-shadow:0 2px 8px rgba(0,0,0,.08);}
 .book-title{font-weight:800;font-size:.98rem;line-height:1.25;margin:10px 0 6px;height:2.5em;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .book-meta{font-size:.8rem;color:#64748b;line-height:1.7;}
@@ -158,7 +160,8 @@ def db():
       "CREATE TABLE IF NOT EXISTS books(id TEXT PRIMARY KEY,title TEXT NOT"
       " NULL,publisher TEXT,pages INTEGER,author TEXT,isbn TEXT,age"
       " TEXT,category TEXT,subcategory TEXT,cover_url TEXT,language TEXT"
-      " DEFAULT 'Türkçe',read_count INTEGER DEFAULT 0,created_at TEXT); "
+      " DEFAULT 'Türkçe',read_count INTEGER DEFAULT 0,created_at TEXT,"
+      " is_school INTEGER DEFAULT 0); "
       "CREATE TABLE IF NOT EXISTS reading_log(id INTEGER PRIMARY KEY"
       " AUTOINCREMENT,book_id TEXT,status TEXT,read_at TEXT,cycle INTEGER"
       " DEFAULT 1);"
@@ -170,6 +173,9 @@ def db():
   if "language" not in columns:
     cursor.execute("ALTER TABLE books ADD COLUMN language TEXT DEFAULT 'Türkçe'")
     con.commit()
+  if "is_school" not in columns:
+    cursor.execute("ALTER TABLE books ADD COLUMN is_school INTEGER DEFAULT 0")
+    con.commit()
 
   if con.execute("select count() from books").fetchone()[0] == 0:
     SEED.parent.mkdir(parents=True, exist_ok=True)
@@ -177,6 +183,7 @@ def db():
       df = pd.read_csv(SEED, dtype=str).fillna("")
       df["created_at"] = datetime.now(TZ).isoformat()
       df["read_count"] = 0
+      df["is_school"] = 0
       if "language" not in df.columns:
         df["language"] = "Türkçe"
       if "cover_url" in df.columns:
@@ -244,6 +251,8 @@ def get_books_df():
     df["read_count"] = pd.to_numeric(df["read_count"], errors="coerce").fillna(0)
   if "language" not in df.columns:
     df["language"] = "Türkçe"
+  if "is_school" not in df.columns:
+    df["is_school"] = 0
   return df
 
 
@@ -389,7 +398,7 @@ with st.sidebar:
           f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
           f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
           f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
-          '<div class="side-ver">Atlas v0.6.6</div>',
+          '<div class="side-ver">Atlas v0.8.2</div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -424,7 +433,9 @@ def show_book_detail(b_id):
       st.image(c_img, use_container_width=True)
     else:
       st.markdown(
-          '<div style="font-size: 6rem; text-align: center;">📘</div>',
+          '<div style="font-size: 6rem; text-align: center;">🏫</div>'
+          if int(b.get("is_school", 0)) == 1
+          else '<div style="font-size: 6rem; text-align: center;">📘</div>',
           unsafe_allow_html=True,
       )
   with col_d2:
@@ -478,18 +489,32 @@ def show_book_detail(b_id):
 def book_card(b, prefix, cover_h=170):
   rc = int(b.get("read_count", 0) or 0)
   img = cover(b.get("cover_url"))
+  is_sch = int(b.get("is_school", 0)) == 1
+
   cover_html = (
-      f'<img src="{html.escape(img)}">' if img else '<span style="font-size:4rem">📘</span>'
+      f'<img src="{html.escape(img)}">'
+      if img
+      else (
+          '<span style="font-size:4rem">🏫</span>'
+          if is_sch
+          else '<span style="font-size:4rem">📘</span>'
+      )
   )
+
   badge = "⭐ Çok Sevildi" if rc >= 3 else ("🏷️ Yeni" if rc == 0 else "")
   badge_html = f'<div class="book-badge">{badge}</div>' if badge else ""
+  school_badge_html = (
+      '<div class="school-badge">🏫 Okul Kitabı</div>' if is_sch else ""
+  )
+
   try:
     pages = int(float(b.get("pages")))
   except (TypeError, ValueError):
     pages = "-"
+
   st.markdown(
       "".join([
-          f'<div class="book-card" style="height:{cover_h + 150}px">{badge_html}',
+          f'<div class="book-card" style="height:{cover_h + 150}px">{badge_html}{school_badge_html}',
           f'<div class="book-cover" style="height:{cover_h}px">{cover_html}</div>',
           f'<div class="book-title">{html.escape(str(b["title"]))}</div>',
           f'<div class="book-meta">👶 {html.escape(str(b.get("age", "-")))}'
@@ -536,7 +561,6 @@ if active_page == "Ana Sayfa":
   for idx, (icon, label, actual) in enumerate(categories):
     n = len(books_df) if actual == "Tümü" else cat_counts.get(actual, 0)
     is_on = active_cat_label == actual
-    # "kitap" yazısı kaldırıldı, sayı parantez içine alındı
     cat_cols[idx].button(
         f"{icon} **{label}**\n\n({n})",
         key=f"{'catON' if is_on else 'cat'}_{idx}",
@@ -604,10 +628,23 @@ if active_page == "Ana Sayfa":
 elif active_page == "Kütüphane":
   st.markdown("### 📖 Kütüphane Arşivi")
 
+  # Kütüphane Seçimi (Ev Kütüphanesi vs De Vuurvlinder Okul Kütüphanesi)
+  lib_tab_choice = st.radio(
+      "Koleksiyon Seçin",
+      ["🏡 Ev Kütüphanesi", "🏫 De Vuurvlinder Okul Kütüphanesi"],
+      horizontal=True,
+      label_visibility="collapsed",
+  )
+
+  is_school_view = "Okul" in lib_tab_choice
+
+  # İlgili koleksiyona göre filtrele
+  lib_base_df = books_df[books_df["is_school"] == (1 if is_school_view else 0)]
+
   all_publishers = sorted(
       {
           str(p).strip()
-          for p in books_df["publisher"].dropna()
+          for p in lib_base_df["publisher"].dropna()
           if str(p).strip() != ""
       }
   )
@@ -642,7 +679,7 @@ elif active_page == "Kütüphane":
         "Kategori Filtrele", cat_options, index=default_cat_idx, key="lib_cat"
     )
 
-  filtered_lib = books_df.copy()
+  filtered_lib = lib_base_df.copy()
   if pub_filter != "Tümü":
     filtered_lib = filtered_lib[filtered_lib["publisher"] == pub_filter]
   if search_query:
@@ -659,7 +696,11 @@ elif active_page == "Kütüphane":
     filtered_lib = filtered_lib[filtered_lib["category"] == cat_filter]
 
   filtered_lib = filtered_lib.sort_values(by="title", ascending=True)
-  st.write(f"📚 Toplam **{len(filtered_lib)}** kitap listeleniyor.")
+  st.write(
+      f"📚 Toplam **{len(filtered_lib)}** kitap listeleniyor ("
+      + ("Okul Kütüphanesi" if is_school_view else "Ev Kütüphanesi")
+      + ")."
+  )
 
   for start in range(0, len(filtered_lib), 4):
     cols = st.columns(4)
@@ -673,7 +714,7 @@ elif active_page == "Okuma Yolculuğu":
   st.markdown("### 🏆 Okuma Karnesi ve Detaylı İstatistikler")
 
   milestones = [
-      ("🏠 Ev", 0), ("✈️️ Havalimanı", 5), ("🚂 Tren İstasyonu", 10),
+      ("🏠 Ev", 0), ("✈ Havalimanı", 5), ("🚂 Tren İstasyonu", 10),
       ("🏰 Şato", 20), ("🌳 Doğa", 35), ("🚀 Uzay", 50), ("🪐 Galaksi", 75),
   ]
   cur_idx = max(i for i, (_, req) in enumerate(milestones) if total_read_books >= req)
@@ -854,6 +895,7 @@ elif active_page == "Yönetici Paneli":
     st.markdown("---")
 
     (
+        adm_tab_school,
         adm_tab1,
         adm_tab2,
         adm_tab3,
@@ -863,7 +905,9 @@ elif active_page == "Yönetici Paneli":
         adm_tab6,
         adm_tab7,
         adm_tab8,
+        adm_tab_delete,
     ) = st.tabs([
+        "🏫 Okul Kitabı Ekle",
         "➕ Yeni Kitap",
         "✏️ Düzenle",
         "🎨 Kapaklar",
@@ -873,7 +917,36 @@ elif active_page == "Yönetici Paneli":
         "📝 Loglar",
         "🧹 Sıfırla",
         "💾 DB Yedek",
+        "🗑️ Kitap Sil",
     ])
+
+    with adm_tab_school:
+      st.subheader("🏫 De Vuurvlinder Okul Kitabı Ekle (Hızlı)")
+      st.markdown("Sadece kitap adını ve sayfa sayısını girerek hızlıca ekleyebilirsin.")
+      with st.form("admin_school_quick_form"):
+        quick_title = st.text_input("Kitap Adı", placeholder="Örn: Nijntje op school")
+        quick_pages = st.number_input("Sayfa Sayısı", min_value=8, max_value=100, value=28)
+        if st.form_submit_button("Okul Kitabını Hızlıca Ekle"):
+          if quick_title:
+            bid = "SCH-" + uuid.uuid4().hex[:8].upper()
+            con = sqlite3.connect(DB_NAME)
+            con.execute(
+                "INSERT INTO books (id, title, author, publisher, category, pages, cover_url, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 1)",
+                (
+                    bid,
+                    quick_title,
+                    "De Vuurvlinder Okulu",
+                    "De Vuurvlinder",
+                    "Hikaye",
+                    quick_pages,
+                    "",
+                    datetime.now(TZ).isoformat(),
+                ),
+            )
+            con.commit()
+            con.close()
+            st.success(f"'{quick_title}' ({quick_pages} sayfa) okul kütüphanesine başarıyla eklendi! 🎒")
+            st.rerun()
 
     with adm_tab1:
       with st.form("admin_add_form"):
@@ -903,9 +976,7 @@ elif active_page == "Yönetici Paneli":
             bid = "MAN-" + uuid.uuid4().hex[:8].upper()
             con = sqlite3.connect(DB_NAME)
             con.execute(
-                "INSERT INTO books (id, title, author, publisher, isbn, category, age,"
-                " pages, language, cover_url, read_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?,"
-                " ?, ?, ?, 0, ?)",
+                "INSERT INTO books (id, title, author, publisher, isbn, category, age, pages, language, cover_url, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)",
                 (
                     bid,
                     new_t,
@@ -952,15 +1023,17 @@ elif active_page == "Yönetici Paneli":
             up_pub = st.text_input(
                 "Yayınevi", value=str(eb.get("publisher", ""))
             )
+            up_pages = st.number_input(
+                "Sayfa Sayısı", value=int(eb.get("pages", 24) or 24)
+            )
             up_lang = st.text_input(
                 "Dil", value=str(eb.get("language", "Türkçe"))
             )
             if st.form_submit_button("Güncelle"):
               con = sqlite3.connect(DB_NAME)
               con.execute(
-                  "UPDATE books SET title = ?, author = ?, publisher = ?, language ="
-                  " ? WHERE id = ?",
-                  (up_title, up_author, up_pub, up_lang, eb["id"]),
+                  "UPDATE books SET title = ?, author = ?, publisher = ?, pages = ?, language = ? WHERE id = ?",
+                  (up_title, up_author, up_pub, up_pages, up_lang, eb["id"]),
               )
               con.commit()
               con.close()
@@ -1002,7 +1075,7 @@ elif active_page == "Yönetici Paneli":
             st.rerun()
 
     with adm_missing_covers:
-      st.subheader("🖼️️ Görseli Eksik Olan Kitaplar ve Hızlı Kapak Ekleme")
+      st.subheader("🖼 Görseli Eksik Olan Kitaplar ve Hızlı Kapak Ekleme")
       missing_df = books_df[
           books_df["cover_url"].isna() | (books_df["cover_url"] == "")
       ]
@@ -1117,3 +1190,45 @@ elif active_page == "Yönetici Paneli":
               mime="application/x-sqlite3",
               use_container_width=True,
           )
+
+    with adm_tab_delete:
+      st.subheader("🗑️ Kütüphaneden Kitap Sil")
+      st.markdown("Silmek istediğiniz kitabı aratın ve kalıcı olarak kaldırın.")
+      
+      del_search_q = st.text_input(
+          "🔍 Silinecek Kitabı Ara",
+          placeholder="Kitap adı yazın...",
+          key="delete_book_search",
+      )
+      
+      matched_del_books = (
+          books_df[
+              books_df["title"]
+              .astype(str)
+              .str.contains(del_search_q.strip(), case=False, na=False)
+          ]
+          if del_search_q.strip()
+          else pd.DataFrame()
+      )
+
+      if len(matched_del_books) > 0:
+        for _, db_item in matched_del_books.iterrows():
+          with st.form(f"delete_book_form_{db_item['id']}"):
+            lib_type = "🏫 Okul Kitabı" if int(db_item.get("is_school", 0)) == 1 else "🏡 Ev Kitabı"
+            st.error(f"📖 **{db_item['title']}** — *{db_item.get('author', 'Bilinmiyor')}* ({lib_type})")
+            
+            confirm_del = st.checkbox("Bu kitabı ve tüm okuma geçmişini kalıcı olarak silmeyi onaylıyorum.", key=f"chk_del_{db_item['id']}")
+            
+            if st.form_submit_button("Kitabı Kalıcı Olarak Sil"):
+              if confirm_del:
+                con = sqlite3.connect(DB_NAME)
+                con.execute("DELETE FROM reading_log WHERE book_id = ?", (db_item["id"],))
+                con.execute("DELETE FROM books WHERE id = ?", (db_item["id"],))
+                con.commit()
+                con.close()
+                st.success(f"'{db_item['title']}' kütüphaneden başarıyla silindi!")
+                st.rerun()
+              else:
+                st.warning("Lütfen silme onay kutucuğunu işaretleyin.")
+      elif del_search_q.strip():
+        st.info("Aradığınız kritere uygun kitap bulunamadı.")
