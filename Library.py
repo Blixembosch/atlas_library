@@ -7,6 +7,7 @@ import sqlite3
 import uuid
 from zoneinfo import ZoneInfo
 import pandas as pd
+import requests
 import streamlit as st
 
 st.set_page_config(
@@ -150,6 +151,50 @@ def akilli_kategori_belirle(title, author, subcategory=""):
   ]
   if any(k in combined for k in bilim_kelimeler):
     return "Bilim"
+  return None
+
+
+def fetch_book_by_isbn(isbn):
+  """Open Library API kullanarak ISBN ile kitap bilgilerini çeker"""
+  clean_isbn = "".join(filter(str.isalnum, str(isbn)))
+  if not clean_isbn:
+    return None
+  try:
+    url = f"https://openlibrary.org/isbn/{clean_isbn}.json"
+    res = requests.get(url, timeout=5)
+    if res.status_code == 200:
+      data = res.json()
+      title = data.get("title", "")
+      pages = data.get("number_of_pages", 28)
+      
+      # Yazar bilgisi
+      author = "Bilinmiyor"
+      authors_data = data.get("authors", [])
+      if authors_data:
+        author_key = authors_data[0].get("key")
+        if author_key:
+          author_res = requests.get(f"https://openlibrary.org{author_key}.json", timeout=3)
+          if author_res.status_code == 200:
+            author = author_res.json().get("name", "Bilinmiyor")
+
+      # Yayınevi
+      publishers = data.get("publishers", ["De Vuurvlinder"])
+      publisher = publishers[0] if publishers else "De Vuurvlinder"
+
+      # Kapak resmi
+      covers = data.get("covers", [])
+      cover_url = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg" if covers else ""
+
+      return {
+          "title": title,
+          "author": author,
+          "publisher": publisher,
+          "pages": int(pages) if pages else 28,
+          "cover_url": cover_url,
+          "isbn": clean_isbn
+      }
+  except Exception:
+    pass
   return None
 
 
@@ -398,7 +443,7 @@ with st.sidebar:
           f'<div class="side-card"><span>📚 Toplam Kitap</span><b>{total_books}</b></div>',
           f'<div class="side-card"><span>🔥 Bu Ay ({current_month_name})</span><b>{month_read_count}</b></div>',
           f'<div class="side-card"><span>⭐ Bu Yıl ({current_year})</span><b>{year_read_count}</b></div>',
-          '<div class="side-ver">Atlas v0.8.2</div>',
+          '<div class="side-ver">Atlas v0.8.3</div>',
       ]),
       unsafe_allow_html=True,
   )
@@ -628,7 +673,6 @@ if active_page == "Ana Sayfa":
 elif active_page == "Kütüphane":
   st.markdown("### 📖 Kütüphane Arşivi")
 
-  # Kütüphane Seçimi (Ev Kütüphanesi vs De Vuurvlinder Okul Kütüphanesi)
   lib_tab_choice = st.radio(
       "Koleksiyon Seçin",
       ["🏡 Ev Kütüphanesi", "🏫 De Vuurvlinder Okul Kütüphanesi"],
@@ -637,8 +681,6 @@ elif active_page == "Kütüphane":
   )
 
   is_school_view = "Okul" in lib_tab_choice
-
-  # İlgili koleksiyona göre filtrele
   lib_base_df = books_df[books_df["is_school"] == (1 if is_school_view else 0)]
 
   all_publishers = sorted(
@@ -921,32 +963,60 @@ elif active_page == "Yönetici Paneli":
     ])
 
     with adm_tab_school:
-      st.subheader("🏫 De Vuurvlinder Okul Kitabı Ekle (Hızlı)")
-      st.markdown("Sadece kitap adını ve sayfa sayısını girerek hızlıca ekleyebilirsin.")
+      st.subheader("🏫 De Vuurvlinder Okul Kitabı Ekle")
+      st.markdown("İstersen **ISBN Numarası** girerek detayları otomatik buldurabilir, istersen sadece **Kitap Adı** yazarak ekleyebilirsin.")
+      
       with st.form("admin_school_quick_form"):
-        quick_title = st.text_input("Kitap Adı", placeholder="Örn: Nijntje op school")
-        quick_pages = st.number_input("Sayfa Sayısı", min_value=8, max_value=100, value=28)
-        if st.form_submit_button("Okul Kitabını Hızlıca Ekle"):
-          if quick_title:
+        sch_isbn = st.text_input("ISBN Numarası (Otomatik bulma için)", placeholder="Örn: 97890258... (İsteğe bağlı)")
+        quick_title = st.text_input("Kitap Adı (ISBN boşsa zorunlu)", placeholder="Örn: Nijntje op school")
+        quick_pages = st.number_input("Sayfa Sayısı", min_value=8, max_value=200, value=28)
+        
+        if st.form_submit_button("Okul Kitabını Ekle"):
+          final_title = quick_title
+          final_author = "De Vuurvlinder Okulu"
+          final_publisher = "De Vuurvlinder"
+          final_pages = quick_pages
+          final_cover = ""
+          final_isbn = sch_isbn
+
+          # ISBN girildiyse API'den çekmeye çalış
+          if sch_isbn.strip():
+            with st.spinner("ISBN ile kitap bilgileri aranıyor... 🔍"):
+              book_data = fetch_book_by_isbn(sch_isbn)
+              if book_data:
+                final_title = book_data["title"] or quick_title
+                final_author = book_data["author"]
+                final_publisher = book_data["publisher"]
+                final_pages = book_data["pages"]
+                final_cover = book_data["cover_url"]
+                final_isbn = book_data["isbn"]
+                st.success("Kitap bilgileri başarıyla bulundu! ✨")
+              else:
+                st.warning("ISBN ile eşleşen kitap bulunamadı, girdiğiniz isimle kaydediliyor.")
+
+          if final_title:
             bid = "SCH-" + uuid.uuid4().hex[:8].upper()
             con = sqlite3.connect(DB_NAME)
             con.execute(
-                "INSERT INTO books (id, title, author, publisher, category, pages, cover_url, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 1)",
+                "INSERT INTO books (id, title, author, publisher, isbn, category, pages, cover_url, read_count, created_at, is_school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 1)",
                 (
                     bid,
-                    quick_title,
-                    "De Vuurvlinder Okulu",
-                    "De Vuurvlinder",
+                    final_title,
+                    final_author,
+                    final_publisher,
+                    final_isbn,
                     "Hikaye",
-                    quick_pages,
-                    "",
+                    final_pages,
+                    final_cover,
                     datetime.now(TZ).isoformat(),
                 ),
             )
             con.commit()
             con.close()
-            st.success(f"'{quick_title}' ({quick_pages} sayfa) okul kütüphanesine başarıyla eklendi! 🎒")
+            st.success(f"'{final_title}' okul kütüphanesine başarıyla eklendi! 🎒")
             st.rerun()
+          else:
+            st.error("Lütfen en azından kitap adını girin.")
 
     with adm_tab1:
       with st.form("admin_add_form"):
